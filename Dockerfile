@@ -2,7 +2,7 @@ FROM eclipse-temurin:25-jdk-alpine
 
 WORKDIR /app
 
-COPY target/mi-portfolio-backend-0.0.1-SNAPSHOT.jar app.jar
+COPY target/portfolio-0.0.1-SNAPSHOT.jar app.jar
 
 EXPOSE 8080
 
