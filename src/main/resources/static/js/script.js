@@ -99,12 +99,32 @@ var io = new IntersectionObserver(function (entries) {
 document.querySelectorAll('.rv').forEach(function (el) { io.observe(el); });
 
 const API_URL = "/api/projects";
+let csrfToken = null;
+
+fetch('/api/csrf-token')
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        csrfToken = data.token;
+        loadProjects();
+    })
+    .catch(error => {
+        console.error("No se pudo obtener el token CSRF:", error);
+        renderFallback();
+    });
 
 async function loadProjects() {
     const container = document.getElementById("projects-container");
-
     try {
-        const res = await fetch(API_URL);
+        const res = await fetch(API_URL, {
+            headers: {
+                "X-CSRF-Token": csrfToken
+            }
+        });
 
         if (!res.ok) throw new Error("API error");
 
@@ -114,7 +134,7 @@ async function loadProjects() {
 
     } catch (error) {
         console.error("Error:", error);
-        renderFallback(); // 🔥 clave
+        renderFallback();
     }
 }
 
@@ -196,5 +216,3 @@ function createGithubCard() {
 function activateReveal() {
     document.querySelectorAll('.pc').forEach(el => io.observe(el));
 }
-
-loadProjects();
