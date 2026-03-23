@@ -98,7 +98,7 @@ var io = new IntersectionObserver(function (entries) {
 
 document.querySelectorAll('.rv').forEach(function (el) { io.observe(el); });
 
-const API_URL = "http://localhost:8080/api/projects";
+const API_URL = "/api/projects";
 
 async function loadProjects() {
     const container = document.getElementById("projects-container");
