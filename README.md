@@ -14,7 +14,7 @@ Construido con buenas prácticas de **Java 25**, **Spring Boot**, **WebFlux** y 
 ## 💻 Stack Tecnológico
 
 **Backend:**  
-- Java 21  
+- Java 25  
 - Spring Boot  
 - Spring WebFlux  
 - REST APIs  
