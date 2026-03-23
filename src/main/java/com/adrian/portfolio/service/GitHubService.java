@@ -2,6 +2,7 @@ package com.adrian.portfolio.service;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,7 +64,8 @@ public class GitHubService {
         dto.setLanguage(repo.getLanguage());
 
         if (repo.getTopics() != null && !repo.getTopics().isEmpty()) {
-            dto.setTopic(repo.getTopics().getFirst());
+            int radmonIndex = ThreadLocalRandom.current().nextInt(repo.getTopics().size());
+            dto.setTopic(repo.getTopics().get(radmonIndex));
         }
 
         return dto;
