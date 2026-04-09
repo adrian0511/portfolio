@@ -57,6 +57,9 @@
             dot.style.border = 'none';
         });
     });
+
+    // Cambiar el año del copyright automáticamente
+    document.getElementById("year").textContent= new Date().getFullYear().toString();
 })();
 
 /* ══ NAV SCROLL ══ */
