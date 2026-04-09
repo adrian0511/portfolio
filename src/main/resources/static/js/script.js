@@ -57,9 +57,6 @@
             dot.style.border = 'none';
         });
     });
-
-    // Cambiar el año del copyright automáticamente
-    document.getElementById("year").textContent= new Date().getFullYear().toString();
 })();
 
 /* ══ NAV SCROLL ══ */
@@ -119,6 +116,9 @@ fetch('/api/csrf-token')
         console.error("No se pudo obtener el token CSRF:", error);
         renderFallback();
     });
+
+// Cambiar el año del copyright automáticamente
+    document.getElementById("year").textContent= new Date().getFullYear().toString();
 
 async function loadProjects() {
     const container = document.getElementById("projects-container");
