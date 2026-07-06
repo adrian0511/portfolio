@@ -4,7 +4,7 @@ export default function Footer() {
   return (
     <footer>
       <span>© <span id="year">{year}</span> Adrián Garcés — Java &amp; Spring enthusiast ☕</span>
-      <span>HTML · CSS · Vanilla JS</span>
+      <span>React · Vite · Spring Boot</span>
     </footer>
   )
 }

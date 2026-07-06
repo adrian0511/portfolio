@@ -16,13 +16,14 @@ export default function Hero() {
         <h1>
           Hola, soy<br />
           <span className="hl">Adrián Garcés</span><br />
-          <span className="out">Backend Dev.</span>
+          <span className="out">Backend Developer.</span>
         </h1>
         <p className="hero-desc">
-          Estudiante de programación especializado en backend con{' '}
-          <strong style={{ color: 'var(--text)' }}>Java &amp; Spring</strong>.
-          Construyo APIs, arquitecturas monolíticas y empiezo a explorar
-          el mundo de los microservicios.
+          Desarrollador backend enfocado en{' '}
+          <strong style={{ color: 'var(--text)' }}>APIs y arquitecturas distribuidas</strong>{' '}
+          escalables y resilientes. Núcleo en{' '}
+          <strong style={{ color: 'var(--text)' }}>Java &amp; Spring</strong>{' '}
+          —microservicios, Kafka, seguridad— y expandiendo hacia Python y Node.js.
         </p>
         <div className="ctas">
           <a href="#projects" className="btn-p">Ver proyectos</a>
@@ -38,12 +39,15 @@ export default function Hero() {
           <div className="photo-frame">
 
             {!imgError && (
-              <img
-                src="/img/Avatar.png"
-                alt="Adrián Garcés"
-                id="profile-img"
-                onError={() => setImgError(true)}
-              />
+              <picture>
+                <source srcSet="/img/Avatar.webp" type="image/webp" />
+                <img
+                  src="/img/Avatar.png"
+                  alt="Adrián Garcés"
+                  id="profile-img"
+                  onError={() => setImgError(true)}
+                />
+              </picture>
             )}
 
             {imgError && (
@@ -61,8 +65,8 @@ export default function Hero() {
         {/* Chips bajo la foto */}
         <div className="photo-chips">
           <span className="chip active">Open to work</span>
-          <span className="chip">Java Dev</span>
           <span className="chip">Backend</span>
+          <span className="chip">Microservicios</span>
         </div>
       </div>
     </section>
