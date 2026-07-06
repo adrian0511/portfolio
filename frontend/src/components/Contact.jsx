@@ -11,7 +11,7 @@ export default function Contact() {
         <a href="mailto:adriangarces0310@gmail.com" className="sl">✉ Email</a>
         <a href="https://github.com/adrian0511" className="sl" target="_blank" rel="noreferrer">⌥ GitHub</a>
         <a href="https://linkedin.com/in/adrdev" className="sl" target="_blank" rel="noreferrer">in LinkedIn</a>
-        <a href="/docs/CV_Adrian.pdf" download="CV_Adrian_Garces.pdf" className="sl">↓ Descargar CV</a>
+        <a href="/docs/ADRIAN_CV.pdf" download="CV_Adrian_Garces.pdf" className="sl">↓ Descargar CV</a>
       </div>
     </section>
   )
