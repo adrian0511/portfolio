@@ -611,12 +611,12 @@ h2 {
 
 .si {
     background: var(--bg);
-    padding: .85rem 1.05rem;
+    padding: 1rem 1.25rem;
     border: 1px solid var(--border);
-    font-size: .73rem;
+    font-size: .84rem;
     display: flex;
     align-items: center;
-    gap: .55rem;
+    gap: .6rem;
     transition: background .2s;
 }
 
@@ -625,8 +625,8 @@ h2 {
 }
 
 .sd {
-    width: 6px;
-    height: 6px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
     background: var(--accent);
@@ -642,11 +642,11 @@ h2 {
 
 /* estudiando = violeta */
 .sleg {
-    margin-top: .9rem;
+    margin-top: 1.1rem;
     display: flex;
     gap: 1.3rem;
     flex-wrap: wrap;
-    font-size: .64rem;
+    font-size: .72rem;
     color: var(--muted2);
 }
 
@@ -767,6 +767,7 @@ h2 {
 /* ════ CONTACT ════ */
 #contact {
     padding: 7rem 4rem 5rem;
+    margin: 0 auto;
     text-align: center;
     position: relative;
 }
