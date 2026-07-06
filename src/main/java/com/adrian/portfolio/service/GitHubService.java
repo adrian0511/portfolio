@@ -2,6 +2,8 @@ package com.adrian.portfolio.service;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +30,18 @@ public class GitHubService {
     @Value("${github.token}")
     private String token;
 
+    @Value("${github.cache-ttl-seconds:600}")
+    private long cacheTtlSeconds;
+
+    private final Map<Integer, Mono<List<RepoDTO>>> cache = new ConcurrentHashMap<>();
+
     public Mono<List<RepoDTO>> getFeaturedRepo(int limit) {
+        return cache.computeIfAbsent(limit,
+                l -> fetchFeaturedRepo(l).cache(Duration.ofSeconds(cacheTtlSeconds)));
+    }
+
+    private Mono<List<RepoDTO>> fetchFeaturedRepo(int limit) {
+        log.info("Cache miss: pidiendo repos a GitHub (limit={})", limit);
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/users/{username}/repos")
