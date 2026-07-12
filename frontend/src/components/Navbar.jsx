@@ -2,8 +2,6 @@ import { useEffect, useRef } from 'react'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import LanguageToggle from './LanguageToggle.jsx'
 
-// Nav fijo que se vuelve "solid" tras 40px de scroll.
-// El toggle de idioma va a la derecha (visible también en mobile, junto a la hamburguesa).
 export default function Navbar({ drawerOpen, onToggleDrawer }) {
   const navRef = useRef(null)
   const { t } = useLanguage()

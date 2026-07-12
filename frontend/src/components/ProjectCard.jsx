@@ -1,7 +1,5 @@
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
-// Tarjeta de proyecto individual. Los datos (name/description) vienen de la API
-// de GitHub, así que no se traducen; sí el texto de respaldo si falta descripción.
 export default function ProjectCard({ repo, index }) {
   const { t } = useLanguage()
   const num = String(index + 1).padStart(2, '0')

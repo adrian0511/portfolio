@@ -1,6 +1,5 @@
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
-// Drawer mobile. La apertura/cierre la controla App (estado drawerOpen).
 export default function MobileDrawer({ open, onClose }) {
   const { t } = useLanguage()
 

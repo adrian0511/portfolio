@@ -1,14 +1,7 @@
-// Cliente de la API del backend Spring Boot.
-//
-// Flujo CSRF (igual que el script.js original):
-//   1. GET /api/csrf-token  -> crea/lee la sesion y devuelve { token }.
-//                              El backend setea la cookie de sesion (SESSION).
-//   2. GET /api/projects    -> requiere el header X-CSRF-Token con ese token;
-//                              el CsrfValidationFilter lo compara contra la sesion.
-//
-// credentials: 'include' garantiza que la cookie de sesion viaje en ambas
-// llamadas (imprescindible para que el token valide). En dev, el proxy de Vite
-// (/api -> :8080) hace que todo sea same-origin y la cookie se preserve.
+// El backend valida el token CSRF contra la sesión, así que la cookie SESSION
+// debe viajar en ambas llamadas: de ahí el credentials: 'include'. Sin él, el
+// token pedido en /api/csrf-token no coincide con ninguna sesión y /api/projects
+// responde 404.
 
 export async function getCsrfToken() {
   const res = await fetch('/api/csrf-token', { credentials: 'include' })

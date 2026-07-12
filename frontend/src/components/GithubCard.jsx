@@ -1,6 +1,5 @@
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
-// Tarjeta fija "Más proyectos en GitHub".
 export default function GithubCard() {
   const { t } = useLanguage()
 

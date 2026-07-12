@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getCsrfToken, getProjects } from '../api/client.js'
 
-// Reproduce el flujo del script.js: pide el token CSRF, luego los proyectos.
-// Ante cualquier error (token o proyectos), pasa a estado 'error' y el
-// componente muestra el fallback. Nota: el backend ya tiene su propio fallback
-// (repos hardcodeados si GitHub falla), asi que normalmente devuelve datos.
+// El backend ya devuelve una lista de respaldo si GitHub falla, así que el
+// estado 'error' solo se alcanza si la propia API no responde.
 export default function useProjects() {
   const [status, setStatus] = useState('loading') // 'loading' | 'success' | 'error'
   const [repos, setRepos] = useState([])

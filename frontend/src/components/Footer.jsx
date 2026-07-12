@@ -1,6 +1,5 @@
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
-// Footer con año dinámico.
 export default function Footer() {
   const { t } = useLanguage()
   const year = new Date().getFullYear()

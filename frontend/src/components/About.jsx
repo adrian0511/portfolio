@@ -1,8 +1,6 @@
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import RichText from './RichText.jsx'
 
-// Seccion Sobre mí + grid de stack.
-// Los nombres de tecnologías no se traducen; sí las etiquetas de la leyenda.
 export default function About() {
   const { t } = useLanguage()
 

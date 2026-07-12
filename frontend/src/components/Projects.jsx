@@ -4,12 +4,10 @@ import useProjects from '../hooks/useProjects.js'
 import useRevealOnScroll from '../hooks/useRevealOnScroll.js'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
-// Seccion Proyectos: consume /api/csrf-token -> /api/projects (ver useProjects).
 export default function Projects() {
   const { status, repos } = useProjects()
   const { t } = useLanguage()
 
-  // Re-escanea el reveal-on-scroll cuando aparecen las tarjetas dinamicas.
   useRevealOnScroll([status, repos.length])
 
   return (

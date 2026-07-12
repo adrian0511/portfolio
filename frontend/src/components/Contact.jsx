@@ -1,7 +1,5 @@
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
-// Seccion Contacto. El CV se descarga en el idioma en que esté la web
-// (el toggle de banderas cambia cuál se baja).
 export default function Contact() {
   const { lang, t } = useLanguage()
 

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import RichText from './RichText.jsx'
 
-// Hero. Si la foto falla al cargar, se muestra el placeholder.
 export default function Hero() {
   const [imgError, setImgError] = useState(false)
   const { t } = useLanguage()

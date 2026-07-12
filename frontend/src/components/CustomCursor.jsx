@@ -1,10 +1,5 @@
 import { useEffect, useRef } from 'react'
 
-// Cursor personalizado (punto + anillo con lag). Port fiel del IIFE del script.js:
-// - solo en dispositivos con mouse fino (hover:hover + pointer:fine)
-// - aparece tras el primer mousemove (.vis)
-// - el punto sigue al instante; el anillo con inercia (0.14)
-// - al hover sobre a/button el punto se agranda como aro
 export default function CustomCursor() {
   const dotRef = useRef(null)
   const ringRef = useRef(null)

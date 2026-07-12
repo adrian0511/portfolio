@@ -1,9 +1,8 @@
 import { useEffect } from 'react'
 
-// Reemplaza el IntersectionObserver del script.js original:
-// revela los elementos .rv (opacity 0 -> 1, translateY) al entrar en viewport,
-// con un stagger de 75ms. Se re-escanea segun `deps` (util cuando aparecen
-// tarjetas nuevas, p.ej. al cargar proyectos en el paso 5).
+// Revela los elementos .rv al entrar en viewport.
+// `deps` fuerza un re-escaneo: los elementos que aparecen después del montaje
+// (p.ej. las tarjetas de proyectos al llegar la respuesta) no se observarían.
 export default function useRevealOnScroll(deps = []) {
   useEffect(() => {
     const io = new IntersectionObserver(
