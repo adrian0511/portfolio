@@ -1,26 +1,29 @@
-// Seccion Sobre mí + grid de stack. Sin .rv (reveal) todavia: se agrega en el paso 4.
+import { useLanguage } from '../i18n/LanguageContext.jsx'
+import RichText from './RichText.jsx'
+
+// Seccion Sobre mí + grid de stack.
+// Los nombres de tecnologías no se traducen; sí las etiquetas de la leyenda.
 export default function About() {
+  const { t } = useLanguage()
+
   return (
     <section id="about">
       <div className="rv">
-        <div className="sec-lbl">01 — Sobre mí</div>
-        <h2>Backend,<br />arquitectura<br />y café. ☕</h2>
+        <div className="sec-lbl">{t.about.label}</div>
+        <h2>
+          {t.about.heading.map((line, i) => (
+            <span key={i}>{line}{i < t.about.heading.length - 1 && <br />}</span>
+          ))}
+        </h2>
         <div className="about-txt">
-          <p>Desarrollador backend enfocado en construir <strong>APIs robustas</strong> y sistemas bien diseñados con
-            <strong> Java y Spring</strong>. Me importa que el software sea <strong>escalable, resiliente</strong> y fácil
-            de mantener.
-          </p>
-          <p>Trabajo arquitecturas de <strong>microservicios y sistemas distribuidos</strong> —Spring Cloud, API Gateway,
-            Eureka, Kafka, Resilience4j— con foco en <strong>seguridad</strong> (Spring Security, OAuth2). En paralelo,
-            expando hacia <strong>Python (FastAPI)</strong> y <strong>Node.js (NestJS)</strong> para no atarme a un solo
-            ecosistema.
-          </p>
-          <p>Busco un <strong>equipo</strong> donde seguir creciendo y aportar valor real desde el primer día.</p>
+          <p><RichText>{t.about.p1}</RichText></p>
+          <p><RichText>{t.about.p2}</RichText></p>
+          <p><RichText>{t.about.p3}</RichText></p>
         </div>
       </div>
 
       <div className="rv">
-        <div className="sec-lbl">Stack</div>
+        <div className="sec-lbl">{t.about.stackLabel}</div>
         <div className="sg">
           {/* Dominado — core Java / Spring */}
           <div className="si"><span className="sd"></span>Java</div>
@@ -50,9 +53,9 @@ export default function About() {
           <div className="si s"><span className="sd"></span>Sequelize</div>
         </div>
         <div className="sleg">
-          <span><span className="sld" style={{ background: 'var(--accent)' }}></span>Dominado</span>
-          <span><span className="sld" style={{ background: 'var(--blue)' }}></span>Microservicios / distribuido</span>
-          <span><span className="sld" style={{ background: '#a78bfa' }}></span>Python / Node.js (aprendiendo)</span>
+          <span><span className="sld" style={{ background: 'var(--accent)' }}></span>{t.about.legend.core}</span>
+          <span><span className="sld" style={{ background: 'var(--blue)' }}></span>{t.about.legend.distributed}</span>
+          <span><span className="sld" style={{ background: '#a78bfa' }}></span>{t.about.legend.learning}</span>
         </div>
       </div>
     </section>

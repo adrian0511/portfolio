@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
+import RichText from './RichText.jsx'
 
-// Hero. Si la foto falla al cargar, se muestra el placeholder
-// (equivalente al onerror del <img> original).
+// Hero. Si la foto falla al cargar, se muestra el placeholder.
 export default function Hero() {
   const [imgError, setImgError] = useState(false)
+  const { t } = useLanguage()
 
   return (
     <section id="hero">
@@ -12,22 +14,18 @@ export default function Hero() {
 
       {/* Texto izquierda */}
       <div className="hero-left">
-        <div className="badge">Disponible para trabajar</div>
+        <div className="badge">{t.hero.badge}</div>
         <h1>
-          Hola, soy<br />
+          {t.hero.greeting}<br />
           <span className="hl">Adrián Garcés</span><br />
-          <span className="out">Backend Developer.</span>
+          <span className="out">{t.hero.role}</span>
         </h1>
         <p className="hero-desc">
-          Desarrollador backend enfocado en{' '}
-          <strong style={{ color: 'var(--text)' }}>APIs y arquitecturas distribuidas</strong>{' '}
-          escalables y resilientes. Núcleo en{' '}
-          <strong style={{ color: 'var(--text)' }}>Java &amp; Spring</strong>{' '}
-          —microservicios, Kafka, seguridad— y expandiendo hacia Python y Node.js.
+          <RichText>{t.hero.desc}</RichText>
         </p>
         <div className="ctas">
-          <a href="#projects" className="btn-p">Ver proyectos</a>
-          <a href="#contact" className="btn-s">Contáctame</a>
+          <a href="#projects" className="btn-p">{t.hero.ctaProjects}</a>
+          <a href="#contact" className="btn-s">{t.hero.ctaContact}</a>
         </div>
       </div>
 
@@ -56,7 +54,7 @@ export default function Hero() {
                   <circle cx="32" cy="22" r="12" />
                   <path d="M8 56c0-13.255 10.745-24 24-24s24 10.745 24 24" />
                 </svg>
-                <span>Sin foto de perfil</span>
+                <span>{t.hero.noPhoto}</span>
               </div>
             )}
 
@@ -64,9 +62,9 @@ export default function Hero() {
         </div>
         {/* Chips bajo la foto */}
         <div className="photo-chips">
-          <span className="chip active">Open to work</span>
-          <span className="chip">Backend</span>
-          <span className="chip">Microservicios</span>
+          {t.hero.chips.map((chip, i) => (
+            <span key={chip} className={`chip${i === 0 ? ' active' : ''}`}>{chip}</span>
+          ))}
         </div>
       </div>
     </section>

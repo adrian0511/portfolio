@@ -1,5 +1,9 @@
-// Tarjeta fija "Más proyectos en GitHub" (equivale a createGithubCard()).
+import { useLanguage } from '../i18n/LanguageContext.jsx'
+
+// Tarjeta fija "Más proyectos en GitHub".
 export default function GithubCard() {
+  const { t } = useLanguage()
+
   return (
     <div
       className="pc rv"
@@ -14,7 +18,7 @@ export default function GithubCard() {
       }}
     >
       <div style={{ fontSize: '1.3rem', color: 'var(--muted)' }}>+</div>
-      <div style={{ fontSize: '.72rem', color: 'var(--muted2)' }}>Más proyectos en GitHub</div>
+      <div style={{ fontSize: '.72rem', color: 'var(--muted2)' }}>{t.projects.more}</div>
       <a
         href="https://github.com/adrian0511"
         target="_blank"

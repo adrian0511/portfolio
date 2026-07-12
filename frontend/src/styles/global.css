@@ -162,6 +162,60 @@ nav.solid {
     color: var(--accent);
 }
 
+/* Grupo derecho del nav: links + idioma + hamburguesa */
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1.6rem;
+}
+
+/* Toggle de idioma (banderas ES / GB) */
+.lang-toggle {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    z-index: 510;
+}
+
+.lang-toggle button {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: .25rem .4rem;
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .1em;
+    color: var(--muted2);
+    opacity: .5;
+    transition: opacity .2s, color .2s, border-color .2s;
+}
+
+.lang-toggle button:hover {
+    opacity: 1;
+    color: var(--text);
+}
+
+.lang-toggle button.active {
+    opacity: 1;
+    color: var(--accent);
+    border-color: var(--border2);
+}
+
+.flag {
+    display: block;
+    width: 18px;
+    height: 12px;
+    border-radius: 1px;
+    flex-shrink: 0;
+}
+
+.hero-desc strong {
+    color: var(--text);
+}
+
 /* Hamburger */
 .hbg {
     display: none;
@@ -933,6 +987,10 @@ footer {
 
     .nav-links {
         display: none
+    }
+
+    .nav-right {
+        gap: .75rem
     }
 
     .hbg {

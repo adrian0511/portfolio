@@ -2,13 +2,12 @@ import ProjectCard from './ProjectCard.jsx'
 import GithubCard from './GithubCard.jsx'
 import useProjects from '../hooks/useProjects.js'
 import useRevealOnScroll from '../hooks/useRevealOnScroll.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 // Seccion Proyectos: consume /api/csrf-token -> /api/projects (ver useProjects).
-// - loading: solo la tarjeta de GitHub (como el estado inicial del HTML original)
-// - success: una ProjectCard por repo + tarjeta de GitHub
-// - error:   mensaje de fallback + tarjeta de GitHub
 export default function Projects() {
   const { status, repos } = useProjects()
+  const { t } = useLanguage()
 
   // Re-escanea el reveal-on-scroll cuando aparecen las tarjetas dinamicas.
   useRevealOnScroll([status, repos.length])
@@ -16,8 +15,12 @@ export default function Projects() {
   return (
     <section id="projects">
       <div className="sec-hdr rv">
-        <div className="sec-lbl">02 — Proyectos</div>
-        <h2>Cosas que<br />he construido.</h2>
+        <div className="sec-lbl">{t.projects.label}</div>
+        <h2>
+          {t.projects.heading.map((line, i) => (
+            <span key={i}>{line}{i < t.projects.heading.length - 1 && <br />}</span>
+          ))}
+        </h2>
       </div>
 
       <div className="pg" id="projects-container">
@@ -36,8 +39,8 @@ export default function Projects() {
               alignItems: 'center',
             }}
           >
-            <h3 style={{ color: 'var(--muted)' }}>No se pudieron cargar los proyectos</h3>
-            <p className="pdesc">Puedes verlos directamente en GitHub</p>
+            <h3 style={{ color: 'var(--muted)' }}>{t.projects.errorTitle}</h3>
+            <p className="pdesc">{t.projects.errorSub}</p>
           </div>
         )}
 
