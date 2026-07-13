@@ -6,7 +6,7 @@ export default function Footer() {
 
   return (
     <footer>
-      <span>© <span id="year">{year}</span> Adrián Garcés — {t.footer.tagline}</span>
+      <span>© <span id="year">{year}</span> Adrián Arsenio Garcés Jiménez — {t.footer.tagline}</span>
       <span>React · Vite · Spring Boot</span>
     </footer>
   )
