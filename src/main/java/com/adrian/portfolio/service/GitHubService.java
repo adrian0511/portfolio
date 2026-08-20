@@ -77,8 +77,8 @@ public class GitHubService {
         dto.setLanguage(repo.getLanguage());
 
         if (repo.getTopics() != null && !repo.getTopics().isEmpty()) {
-            int radmonIndex = ThreadLocalRandom.current().nextInt(repo.getTopics().size());
-            dto.setTopic(repo.getTopics().get(radmonIndex));
+            int randomIndex = ThreadLocalRandom.current().nextInt(repo.getTopics().size());
+            dto.setTopic(repo.getTopics().get(randomIndex));
         }
 
         return dto;
