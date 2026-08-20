@@ -25,7 +25,7 @@ export const translations = {
     },
     about: {
       label: '01 — Sobre mí',
-      heading: ['Backend,', 'arquitectura', 'y café. ☕'],
+      heading: ['Backend,', 'arquitectura', 'y buenas prácticas.'],
       p1:
         'Desarrollador backend enfocado en construir **APIs robustas** y sistemas bien diseñados con ' +
         '**Java y Spring**. Me importa que el software sea **escalable, resiliente** y fácil de mantener.',
@@ -54,11 +54,11 @@ export const translations = {
       heading: ['Trabajemos', 'juntos.'],
       sub:
         '¿Tienes un proyecto backend interesante o quieres hablar de arquitectura de software? ' +
-        'Mi inbox siempre está abierto.',
-      cv: '↓ Descargar CV',
+        'Escríbeme, estaré encantado de hablar contigo.',
+      cv: 'Descargar CV',
     },
     footer: {
-      tagline: 'Java & Spring enthusiast ☕',
+      tagline: 'Backend Developer, Java & Spring',
     },
   },
 
@@ -83,7 +83,7 @@ export const translations = {
     },
     about: {
       label: '01 — About',
-      heading: ['Backend,', 'architecture', 'and coffee. ☕'],
+      heading: ['Backend,', 'architecture', 'and best practices.'],
       p1:
         'Backend developer focused on building **robust APIs** and well-designed systems with ' +
         '**Java and Spring**. I care about software being **scalable, resilient** and easy to maintain.',
@@ -112,11 +112,11 @@ export const translations = {
       heading: ["Let's work", 'together.'],
       sub:
         'Got an interesting backend project, or want to talk software architecture? ' +
-        'My inbox is always open.',
-      cv: '↓ Download CV',
+        "Feel free to reach out — I'd be glad to talk.",
+      cv: 'Download CV',
     },
     footer: {
-      tagline: 'Java & Spring enthusiast ☕',
+      tagline: 'Backend Developer, Java & Spring',
     },
   },
 }

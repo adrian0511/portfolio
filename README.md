@@ -22,6 +22,7 @@ Construido con buenas prácticas de **Java 25**, **Spring Boot**, **WebFlux** y 
 **Frontend:**  
 - React 18 + Vite (JavaScript)  
 - CSS3 (global, con variables), diseño responsivo y animaciones  
+- i18n propio español/inglés (detección por navegador + persistencia)  
 - Consumo dinámico de la API de GitHub (flujo CSRF por sesión)  
 
 El código del frontend vive en [`frontend/`](frontend/). Durante `./mvnw package` se
@@ -36,7 +37,28 @@ compila con Vite y se empaqueta dentro del jar (se sirve como estático en `/`).
 - Responsive para escritorio, tablet y móvil  
 - Animaciones y cursor personalizado  
 - Drawer mobile para navegación  
-- Sección de contacto con enlaces a GitHub, LinkedIn y correo
+- Selector de idioma español/inglés con detección automática  
+- Sección de contacto con enlaces a GitHub, LinkedIn, correo y descarga de CV por idioma
+
+---
+
+## ✅ Tests
+
+**Backend** (JUnit 5, Mockito, WebTestClient — sin red, todo mockeado):
+```bash
+./mvnw test
+```
+
+**Frontend** (Vitest + Testing Library):
+```bash
+cd frontend
+npm test
+```
+
+Cubren el flujo CSRF completo (token → cookie → `/api/projects`), el fallback de
+`GitHubService` cuando GitHub falla, y los hooks/componentes con lógica propia del
+frontend (`useProjects`, `LanguageContext`, `RichText`, etc.). Detalle completo en
+[`CLAUDE.md`](CLAUDE.md#testing).
 
 ---
 

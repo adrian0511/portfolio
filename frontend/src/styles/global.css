@@ -16,8 +16,7 @@ html {
     --surf: #0d0e18;
     --border: #181928;
     --border2: #222336;
-    --accent: #f89820;
-    --blue: #5b8ef0;
+    --accent: #5b8ef0;
     --green: #4ade80;
     --muted: #454663;
     --muted2: #8b8daf;
@@ -354,7 +353,7 @@ nav.solid {
     position: absolute;
     width: 650px;
     height: 650px;
-    background: radial-gradient(circle, rgba(248, 152, 32, .065) 0%, transparent 65%);
+    background: radial-gradient(circle, rgba(91, 142, 240, .065) 0%, transparent 65%);
     top: 50%;
     left: 40%;
     transform: translate(-50%, -50%);
@@ -375,7 +374,7 @@ nav.solid {
     letter-spacing: .14em;
     text-transform: uppercase;
     color: var(--accent);
-    border: 1px solid rgba(248, 152, 32, .28);
+    border: 1px solid rgba(91, 142, 240, .28);
     padding: .34rem .85rem;
     border-radius: 2px;
     margin-bottom: 1.8rem;
@@ -458,7 +457,7 @@ h1 .out {
 
 .btn-p:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 26px rgba(248, 152, 32, .32);
+    box-shadow: 0 8px 26px rgba(91, 142, 240, .32);
 }
 
 .btn-s {
@@ -687,14 +686,35 @@ h2 {
 }
 
 .si.l .sd {
-    background: var(--blue);
+    background: var(--green);
 }
 
 .si.s .sd {
-    background: #a78bfa;
+    background: #fbbf24;
 }
 
-/* estudiando = violeta */
+.si-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--accent);
+    transition: transform .2s ease, filter .2s ease;
+}
+
+.si.l .si-icon {
+    color: var(--green);
+}
+
+.si.s .si-icon {
+    color: #fbbf24;
+}
+
+.si:hover .si-icon {
+    transform: scale(1.18) rotate(-4deg);
+    filter: drop-shadow(0 0 6px currentColor);
+}
+
+/* aprendiendo = ámbar */
 .sleg {
     margin-top: 1.1rem;
     display: flex;
@@ -747,7 +767,7 @@ h2 {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(248, 152, 32, .04), transparent 55%);
+    background: linear-gradient(135deg, rgba(91, 142, 240, .04), transparent 55%);
     opacity: 0;
     transition: opacity .3s;
     pointer-events: none;
@@ -771,7 +791,7 @@ h2 {
     font-size: .61rem;
     padding: .18rem .48rem;
     border: 1px solid var(--border2);
-    color: var(--blue);
+    color: var(--green);
     letter-spacing: .09em;
     text-transform: uppercase;
 }
@@ -874,6 +894,9 @@ h2 {
 }
 
 .sl {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
     border: 1px solid var(--border2);
     padding: .7rem 1.3rem;
     font-size: .69rem;
@@ -882,6 +905,12 @@ h2 {
     color: var(--muted2);
     text-decoration: none;
     transition: color .2s, border-color .2s, background .2s
+}
+
+.sl svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
 }
 
 .sl:hover {
