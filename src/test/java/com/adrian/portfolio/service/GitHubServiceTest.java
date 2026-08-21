@@ -43,7 +43,7 @@ class GitHubServiceTest {
                   {"name":"adrian0511","description":"soy yo","html_url":"x","language":"Java","fork":false,"topics":[]},
                   {"name":"forked-repo","description":"desc","html_url":"x","language":"Java","fork":true,"topics":[]},
                   {"name":"sin-desc","description":null,"html_url":"x","language":"Java","fork":false,"topics":[]},
-                  {"name":"proyecto-valido","description":"Un proyecto","html_url":"https://github.com/adrian0511/proyecto-valido","language":"Java","fork":false,"topics":["spring","backend"]}
+                  {"name":"proyecto-valido","description":"Un proyecto","html_url":"https://github.com/adrian0511/proyecto-valido","language":"Java","fork":false,"topics":["spring","backend"],"pushed_at":"2026-08-20T18:49:41Z"}
                 ]
                 """;
 
@@ -57,7 +57,75 @@ class GitHubServiceTest {
         assertThat(dto.getDescription()).isEqualTo("Un proyecto");
         assertThat(dto.getHtml_url()).isEqualTo("https://github.com/adrian0511/proyecto-valido");
         assertThat(dto.getLanguage()).isEqualTo("Java");
-        assertThat(dto.getTopic()).isIn("spring", "backend");
+        assertThat(dto.getPushed_at()).isEqualTo("2026-08-20T18:49:41Z");
+        // "backend" es genérico y se descarta; "spring" sí describe el proyecto.
+        assertThat(dto.getTopics()).containsExactly("spring");
+    }
+
+    @Test
+    void priorizaTopicsConceptualesYDescartaGenericosYElDelLenguaje() {
+        String json = """
+                [
+                  {"name":"cookbook","description":"d","html_url":"x","language":"Java","fork":false,
+                   "topics":["clean-architecture","ddd","docker","full-stack","hexagonal-architecture","java","postgresql"]}
+                ]
+                """;
+
+        GitHubService service = buildService(webClientReturning(json), "");
+
+        List<String> topics = service.getFeaturedRepo(5).block().get(0).getTopics();
+
+        // clean-architecture y ddd caen por ser sinónimos de hexagonal-architecture,
+        // así que los huecos restantes los ocupa el stack.
+        assertThat(topics).containsExactly("hexagonal-architecture", "docker", "postgresql");
+        assertThat(topics).doesNotContain("full-stack", "java");
+    }
+
+    @Test
+    void noRepiteDosTopicsDelMismoGrupoDeSinonimos() {
+        String json = """
+                [
+                  {"name":"finance","description":"d","html_url":"x","language":"Java","fork":false,
+                   "topics":["artificial-intelligence","finance","generative-ai","jwt-authentication","security"]}
+                ]
+                """;
+
+        GitHubService service = buildService(webClientReturning(json), "");
+
+        // De autenticación y de IA entra solo el de mayor prioridad de cada grupo:
+        // "security" y "artificial-intelligence" quedan fuera por redundantes.
+        assertThat(service.getFeaturedRepo(5).block().get(0).getTopics())
+                .containsExactly("jwt-authentication", "generative-ai", "finance");
+    }
+
+    @Test
+    void reservaHuecoParaElStackAunqueSobrenTopicsConceptuales() {
+        String json = """
+                [
+                  {"name":"varios","description":"d","html_url":"x","language":"Java","fork":false,
+                   "topics":["microservices","kafka","resilience4j","postgresql"]}
+                ]
+                """;
+
+        GitHubService service = buildService(webClientReturning(json), "");
+
+        // 3 conceptuales disponibles, pero solo entran 2: el hueco que queda es
+        // siempre para el stack.
+        assertThat(service.getFeaturedRepo(5).block().get(0).getTopics())
+                .containsExactly("microservices", "resilience4j", "postgresql");
+    }
+
+    @Test
+    void repoSinTopicsDevuelveListaVaciaEnLugarDeNull() {
+        String json = """
+                [
+                  {"name":"pelado","description":"d","html_url":"x","language":"Java","fork":false,"topics":[]}
+                ]
+                """;
+
+        GitHubService service = buildService(webClientReturning(json), "");
+
+        assertThat(service.getFeaturedRepo(5).block().get(0).getTopics()).isEmpty();
     }
 
     @Test

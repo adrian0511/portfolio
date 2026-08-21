@@ -781,18 +781,61 @@ h2 {
     opacity: 1
 }
 
+.pc-link {
+    display: flex;
+    flex-direction: column;
+    gap: .85rem;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+}
+
+.pc-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 .pnum {
     font-size: .61rem;
     color: var(--muted);
     letter-spacing: .14em
 }
 
+.plang {
+    display: inline-flex;
+    align-items: center;
+    gap: .38rem;
+    font-size: .63rem;
+    color: var(--muted2);
+    letter-spacing: .06em;
+}
+
+.plang-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.plang-icon {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+}
+
+.ptags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+}
+
 .ptag {
-    font-size: .61rem;
-    padding: .18rem .48rem;
+    font-size: .58rem;
+    padding: .18rem .45rem;
     border: 1px solid var(--border2);
     color: var(--green);
-    letter-spacing: .09em;
+    letter-spacing: .06em;
     text-transform: uppercase;
 }
 
@@ -803,17 +846,33 @@ h2 {
     letter-spacing: -.02em
 }
 
+/* Las descripciones de GitHub van de 1 a 5 líneas; el clamp mantiene la grid
+   pareja sin recortar el texto en el origen. Sin flex-grow: si la caja crece
+   más de 3 líneas, el clamp corta pero el resto del texto se sigue viendo. */
 .pdesc {
     font-size: .74rem;
     color: var(--muted2);
     line-height: 1.72;
-    flex: 1
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .plinks {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: .9rem;
-    margin-top: .4rem
+    margin-top: auto;
+    padding-top: .4rem
+}
+
+.pupdated {
+    font-size: .58rem;
+    color: var(--muted);
+    letter-spacing: .04em;
 }
 
 .pl {

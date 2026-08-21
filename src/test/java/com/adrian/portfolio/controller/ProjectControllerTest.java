@@ -20,7 +20,8 @@ class ProjectControllerTest {
 
     @Test
     void devuelve200ConLaListaDeProyectosCuandoHayResultados() {
-        RepoDTO repo = new RepoDTO("demo", "desc", "https://github.com/adrian0511/demo", "Java", "backend");
+        RepoDTO repo = new RepoDTO("demo", "desc", "https://github.com/adrian0511/demo", "Java",
+                List.of("spring-boot"), "2026-08-20T18:49:41Z");
         when(service.getFeaturedRepo(5)).thenReturn(Mono.just(List.of(repo)));
 
         client.get().uri("/api/projects")

@@ -1,5 +1,7 @@
 package com.adrian.portfolio.dto;
 
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,5 +14,6 @@ public class RepoDTO {
     private String description;
     private String html_url;
     private String language;
-    private String topic;
+    private List<String> topics;
+    private String pushed_at;
 }

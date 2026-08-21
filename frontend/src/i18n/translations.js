@@ -48,6 +48,7 @@ export const translations = {
       errorSub: 'Puedes verlos directamente en GitHub',
       fallbackDesc: 'Proyecto backend con Spring Boot',
       more: 'Más proyectos en GitHub',
+      updated: 'Actualizado',
     },
     contact: {
       label: '03 — Contacto',
@@ -106,6 +107,7 @@ export const translations = {
       errorSub: 'You can see them directly on GitHub',
       fallbackDesc: 'Backend project with Spring Boot',
       more: 'More projects on GitHub',
+      updated: 'Updated',
     },
     contact: {
       label: '03 — Contact',

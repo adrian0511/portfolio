@@ -141,12 +141,15 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
   "description": "string",
   "html_url": "string",
   "language": "string",
-  "topic": "string"
+  "topics": ["string"],
+  "pushed_at": "2026-08-20T18:49:41Z"
 }
 ```
+`topics` llega ya curado (máx. 3) y puede venir vacío. `pushed_at` es `null` en la lista de respaldo.
 
 ### Detalles del backend relevantes para el frontend
 - **`GitHubService`**: pide los repos del usuario a `api.github.com`, filtra forks / repo homónimo / sin descripción, toma los primeros N (5), mapea a `RepoDTO`. Cachea la respuesta en memoria (`Mono.cache(ttl)`, TTL vía `github.cache-ttl-seconds`) para no repetir la llamada a GitHub en cada visita. Timeout 7s. Si GitHub falla, devuelve una **lista fallback hardcodeada** de 5 proyectos (nunca rompe).
+- **Curación de topics** (`GitHubService.pickTopics`): un repo suele traer 10-16 topics, de los que solo se muestran **3**. Se descartan los genéricos (`NOISE_TOPICS`: backend, full-stack…) y el que repite el lenguaje; se priorizan los conceptuales (`CONCEPT_TOPICS`: arquitectura, seguridad, dominio) con un tope de 2 para **reservar hueco al stack**; y `SYNONYM_GROUPS` evita mostrar dos etiquetas que dicen lo mismo (p. ej. `jwt-authentication` + `security`). El resultado es **determinista**: antes se elegía un topic al azar y cambiaba al expirar la caché.
 - **`CsrfValidationFilter`** (`@Order(-100)`): intercepta **solo** `/api/projects`. Si falta el header o no coincide con el token en sesión → responde `404`. El frontend, ante error, muestra su propio fallback (estado `error` en `useProjects`).
 - **`SecurityConfig`**: CSRF de Spring **deshabilitado** (se usa el filtro custom), CSP propia (`script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, etc.), todo `permitAll`.
 - La validación CSRF depende de la **sesión** (cookie `SESSION`). En dev el proxy de Vite preserva la cookie; en el jar es same-origin y funciona directo.
@@ -158,7 +161,7 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 - `MobileDrawer` — drawer mobile (estado en `App`, cierra con Escape / al navegar).
 - `Hero` — texto + foto (con `onError` → placeholder) + chips.
 - `About` — bio + grid de stack (dominado / aprendiendo / estudiando).
-- `Projects` + `ProjectCard` + `GithubCard` — tarjetas desde la API con fallback.
+- `Projects` + `ProjectCard` + `GithubCard` — tarjetas desde la API con fallback. `ProjectCard` muestra chip de lenguaje (logo de `react-icons` tintado con el color de linguist; punto de color como fallback si el lenguaje no tiene logo), título legible (`gym-reservas` → `Gym Reservas`, respetando nombres tipo `RetosConIA`), descripción recortada a 3 líneas (`-webkit-line-clamp`), chips de topics y "actualizado hace X" vía `Intl.RelativeTimeFormat` (sin cadenas de traducción propias para las unidades).
 - `Contact` — links (email, GitHub, LinkedIn, descarga de CV según idioma activo).
 - `Footer` — año dinámico (`new Date().getFullYear()`).
 - `RichText` — convierte `**texto**` en `<strong>` construyendo nodos React (sin `dangerouslySetInnerHTML`).
@@ -185,7 +188,7 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 ```bash
 ./mvnw test
 ```
-- `GitHubServiceTest` — unitario, sin red: construye el `WebClient` con `exchangeFunction(...)` fake para simular respuestas de GitHub. Cubre filtrado (forks / repo homónimo / sin descripción), mapeo a `RepoDTO`, fallback ante error, caché (no repite la llamada HTTP) y el header `Authorization: Bearer` condicionado a que haya token.
+- `GitHubServiceTest` — unitario, sin red: construye el `WebClient` con `exchangeFunction(...)` fake para simular respuestas de GitHub. Cubre filtrado (forks / repo homónimo / sin descripción), mapeo a `RepoDTO`, fallback ante error, caché (no repite la llamada HTTP), el header `Authorization: Bearer` condicionado a que haya token, y la curación de topics (genéricos descartados, prioridad conceptual, hueco reservado al stack, sinónimos deduplicados, repo sin topics → lista vacía).
 - `CsrfValidationFilterTest` — unitario sobre el `WebFilter` con `MockServerWebExchange`: sin header → 404, header que no coincide con la sesión → 404, header válido → deja pasar, rutas distintas de `/api/projects` no se validan.
 - `CsrfTokenControllerTest` — `WebTestClient.bindToController(...)`: token no vacío + cookie de sesión, mismo token en la misma sesión, tokens distintos entre sesiones.
 - `ProjectControllerTest` — `WebTestClient.bindToController(...)` con `GitHubService` mockeado: 200 con la lista, 200 con lista vacía, y el camino defensivo 204 (`Mono.empty()`) del controller.
@@ -202,8 +205,9 @@ npm run test:watch
 - `hooks/useRevealOnScroll.test.jsx` — `IntersectionObserver` mockeado: observa los `.rv` al montar, añade `.on` al intersectar, `disconnect()` al desmontar.
 - `i18n/LanguageContext.test.jsx` — detección de idioma (`localStorage` > navegador > default), `setLang` (persistencia, `<html lang>`, idiomas no soportados), error al usar `useLanguage` fuera del provider.
 - `components/RichText.test.jsx`, `LanguageToggle.test.jsx`, `Contact.test.jsx`, `Footer.test.jsx` — comportamiento observable: negritas → `<strong>`, botón de idioma activo/click, CV descargable por idioma, año dinámico.
+- `components/ProjectCard.test.jsx` — título legible (y respeto de mayúsculas existentes), chips de lenguaje y topics, ausencia de chips si el repo no trae topics, "actualizado hace X" localizado (con `vi.setSystemTime`) y omitido si no hay `pushed_at`, enlace y descripción de respaldo.
 
-No hay tests de `CustomCursor` (loop de `requestAnimationFrame` puramente imperativo) ni de componentes de solo layout (`Hero`, `About`, `Navbar`, `MobileDrawer`, `ProjectCard`, `GithubCard`, `Projects`) — bajo valor relativo al esfuerzo de mockear DOM/IntersectionObserver para lo que son, en esencia, vistas sin lógica propia.
+No hay tests de `CustomCursor` (loop de `requestAnimationFrame` puramente imperativo) ni de componentes de solo layout (`Hero`, `About`, `Navbar`, `MobileDrawer`, `GithubCard`, `Projects`) — bajo valor relativo al esfuerzo de mockear DOM/IntersectionObserver para lo que son, en esencia, vistas sin lógica propia.
 
 ---
 
@@ -214,13 +218,15 @@ No hay tests de `CustomCursor` (loop de `requestAnimationFrame` puramente impera
 - DTOs con Lombok (`@Data`, `@AllArgsConstructor`, `@NoArgsConstructor`).
 - Frontend: React funcional con hooks; JavaScript (no TS); CSS global por ahora.
 - Español en textos de UI y (parcialmente) comentarios.
+- **Comentarios solo si son necesarios**: se comenta el *porqué* de una decisión no evidente (un workaround, una restricción externa, una alternativa descartada), nunca el *qué* hace el código. Si el comentario se limita a repetir lo que ya dice el nombre de la función o la línea siguiente, sobra.
 
 ## Notas / deuda técnica conocida
 - **Java 25 requerido para buildear**: el `maven-compiler-plugin` fuerza `source/target=25` aunque `java.version=21`. Unificar (o bien a 21, o alinear todo a 25).
 - Links del drawer y del `#contact` ya apuntan a los perfiles reales (`github.com/adrian0511`, `linkedin.com/in/adrdev`).
-- Estilos inline aún abundantes en algunos componentes (Hero, ProjectCard, GithubCard) — candidatos a mover a CSS/Modules.
+- Estilos inline aún abundantes en algunos componentes (Hero, GithubCard) — candidatos a mover a CSS/Modules. `ProjectCard` ya está migrado (clase `.pc-link`).
 - CSS global pendiente de pasar a CSS Modules de forma incremental.
 - **Sin CI/CD**: no hay workflow de GitHub Actions que ejecute `./mvnw test` / `npm test` en cada push o PR. Los tests existen pero corren solo en local por ahora.
 - **`vite` (devDependency) con vulnerabilidades conocidas** (moderate/high, vía `npm audit`): afectan solo al servidor de desarrollo (`vite dev`), no al build de producción que sirve Spring Boot. Actualizar a Vite 8 es un cambio mayor (breaking) pendiente de evaluar aparte.
 - Sin linter configurado en el frontend (no hay `.eslintrc` ni script `lint`).
+- **`pushed_at` no es la fecha del último commit**: GitHub lo actualiza con cualquier push a *cualquier* rama (ramas de Dependabot, borrado de ramas…), así que el "Actualizado hace X" de las tarjetas puede indicar actividad que no es del autor. La fecha real sería `GET /repos/{owner}/{repo}/commits?per_page=1` (una llamada extra por repo). Se optó por mantener `pushed_at` por simplicidad.
 - No hay `<link rel="alternate" hreflang="es|en">` en `index.html` pese al contenido bilingüe (solo `og:locale:alternate`).

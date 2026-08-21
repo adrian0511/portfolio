@@ -41,7 +41,8 @@ class CsrfFlowIntegrationTest {
     @Test
     void tokenValidoConSuMismaSesionPermiteConsultarProyectos() {
         when(gitHubService.getFeaturedRepo(5))
-                .thenReturn(Mono.just(List.of(new RepoDTO("demo", "desc", "url", "Java", "backend"))));
+                .thenReturn(Mono.just(List.of(
+                        new RepoDTO("demo", "desc", "url", "Java", List.of("spring-boot"), "2026-08-20T18:49:41Z"))));
 
         EntityExchangeResult<Map<String, String>> tokenResult = client.get().uri("/api/csrf-token")
                 .exchange().expectStatus().isOk().expectBody(TOKEN_TYPE).returnResult();

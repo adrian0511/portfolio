@@ -17,5 +17,6 @@ public class GithubRepoResponse {
     private String language;
     private Boolean fork;
     private List<String> topics;
+    private String pushed_at;
 
 }
