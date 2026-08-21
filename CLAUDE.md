@@ -18,7 +18,7 @@ Guía para trabajar en este repositorio. Portfolio personal: **backend Spring Bo
 - React 18 + Vite (JavaScript, sin TypeScript)
 - i18n propio (es/en) vía Context (`i18n/LanguageContext.jsx` + `translations.js`), sin librería externa
 - CSS global (`frontend/src/styles/global.css`, con variables `:root`); plan de pasar a CSS Modules de forma incremental
-- Fuentes vía Google Fonts (JetBrains Mono, Syne)
+- Fuentes **autoalojadas** en `public/fonts/` (JetBrains Mono, Syne): son fuentes variables, un fichero por familia y subset. Declaradas en `src/styles/fonts.css`, que `global.css` importa (Vite lo inlinea, no añade petición)
 - Tests: Vitest + @testing-library/react + jsdom
 - Se compila con Vite y se empaqueta dentro del jar (servido como estático en `/`)
 
@@ -36,11 +36,13 @@ portfolio/
 │   ├── vite.config.js          # proxy /api -> :8080 en dev + plugin SEO (sitemap, BUILD_TIME)
 │   ├── vitest.config.js        # config de tests (jsdom + @testing-library)
 │   ├── index.html              # entry de Vite (meta SEO, Open Graph, JSON-LD)
-│   ├── public/                 # assets estáticos (img/Avatar.png|webp, docs/CV_Adrian_Garces_ES|EN.pdf, favicon.svg, robots.txt)
+│   ├── public/                 # assets estáticos (img/Avatar.jpg|webp, fonts/*.woff2, docs/CV_Adrian_Garces_ES|EN.pdf, favicon.svg, robots.txt)
 │   └── src/
 │       ├── main.jsx            # monta <App>, importa global.css
 │       ├── App.jsx             # compone las secciones + estado del drawer
-│       ├── styles/global.css   # todo el estilo (copia evolucionada del styles.css original)
+│       ├── styles/
+│       │   ├── global.css      # todo el estilo (copia evolucionada del styles.css original)
+│       │   └── fonts.css       # @font-face de las fuentes autoalojadas (importado por global.css)
 │       ├── api/
 │       │   ├── client.js       # getCsrfToken() + getProjects(token)
 │       │   └── client.test.js
@@ -151,7 +153,11 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 - **`GitHubService`**: pide los repos del usuario a `api.github.com`, filtra forks / repo homónimo / sin descripción, toma los primeros N (5), mapea a `RepoDTO`. Cachea la respuesta en memoria (`Mono.cache(ttl)`, TTL vía `github.cache-ttl-seconds`) para no repetir la llamada a GitHub en cada visita. Timeout 7s. Si GitHub falla, devuelve una **lista fallback hardcodeada** de 5 proyectos (nunca rompe).
 - **Curación de topics** (`GitHubService.pickTopics`): un repo suele traer 10-16 topics, de los que solo se muestran **3**. Se descartan los genéricos (`NOISE_TOPICS`: backend, full-stack…) y el que repite el lenguaje; se priorizan los conceptuales (`CONCEPT_TOPICS`: arquitectura, seguridad, dominio) con un tope de 2 para **reservar hueco al stack**; y `SYNONYM_GROUPS` evita mostrar dos etiquetas que dicen lo mismo (p. ej. `jwt-authentication` + `security`). El resultado es **determinista**: antes se elegía un topic al azar y cambiaba al expirar la caché.
 - **`CsrfValidationFilter`** (`@Order(-100)`): intercepta **solo** `/api/projects`. Si falta el header o no coincide con el token en sesión → responde `404`. El frontend, ante error, muestra su propio fallback (estado `error` en `useProjects`).
-- **`SecurityConfig`**: CSRF de Spring **deshabilitado** (se usa el filtro custom), CSP propia (`script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, etc.), todo `permitAll`.
+- **`SecurityConfig`**: CSRF de Spring **deshabilitado** (se usa el filtro custom), CSP propia (`script-src 'self'`, `font-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, etc.), todo `permitAll`. También desactiva el `cache()` por defecto de Spring Security, que ponía `no-store` en **toda** respuesta e impedía cachear los estáticos.
+- **`CacheControlFilter`** (`@Order(-90)`): fija `Cache-Control` por ruta en `beforeCommit` (para ganar al manejador de estáticos):
+  - `/assets/**` y `/fonts/**` → `public, max-age=31536000, immutable` (Vite pone hash de contenido en el nombre; **sustituir una fuente obliga a renombrarla**).
+  - `/img/**`, `/docs/**`, `/favicon.svg` → `public, max-age=86400` (nombres estables que sí cambian: avatar, CV).
+  - Resto, incluidos `index.html` y `/api/**` → `no-store`. **`index.html` nunca debe cachearse**: es quien apunta a los assets con hash, y cachearlo impediría que llegara un despliegue nuevo.
 - La validación CSRF depende de la **sesión** (cookie `SESSION`). En dev el proxy de Vite preserva la cookie; en el jar es same-origin y funciona directo.
 
 ### Secciones / componentes React
@@ -190,6 +196,7 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 ```
 - `GitHubServiceTest` — unitario, sin red: construye el `WebClient` con `exchangeFunction(...)` fake para simular respuestas de GitHub. Cubre filtrado (forks / repo homónimo / sin descripción), mapeo a `RepoDTO`, fallback ante error, caché (no repite la llamada HTTP), el header `Authorization: Bearer` condicionado a que haya token, y la curación de topics (genéricos descartados, prioridad conceptual, hueco reservado al stack, sinónimos deduplicados, repo sin topics → lista vacía).
 - `CsrfValidationFilterTest` — unitario sobre el `WebFilter` con `MockServerWebExchange`: sin header → 404, header que no coincide con la sesión → 404, header válido → deja pasar, rutas distintas de `/api/projects` no se validan.
+- `CacheControlFilterTest` — la política de caché por ruta: assets con hash y fuentes inmutables, imágenes/CV a un día, y `index.html` + `/api/**` sin cachear nunca (esto último es el que protege los despliegues).
 - `CsrfTokenControllerTest` — `WebTestClient.bindToController(...)`: token no vacío + cookie de sesión, mismo token en la misma sesión, tokens distintos entre sesiones.
 - `ProjectControllerTest` — `WebTestClient.bindToController(...)` con `GitHubService` mockeado: 200 con la lista, 200 con lista vacía, y el camino defensivo 204 (`Mono.empty()`) del controller.
 - `CsrfFlowIntegrationTest` — `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@AutoConfigureWebTestClient`, con `GitHubService` reemplazado por `@MockitoBean`: valida el flujo real csrf-token → cookie + header → `/api/projects`, incluidos los caminos 404 (sin header, o token de otra sesión).
@@ -210,6 +217,16 @@ npm run test:watch
 No hay tests de `CustomCursor` (loop de `requestAnimationFrame` puramente imperativo) ni de componentes de solo layout (`Hero`, `About`, `Navbar`, `MobileDrawer`, `GithubCard`, `Projects`) — bajo valor relativo al esfuerzo de mockear DOM/IntersectionObserver para lo que son, en esencia, vistas sin lógica propia.
 
 ---
+
+## Rendimiento
+
+Decisiones tomadas y por qué (medido con Playwright contra el jar de producción):
+
+- **Caché de estáticos** (`CacheControlFilter`): antes todo salía con `no-store` por el default de Spring Security, así que **cada visita recurrente re-descargaba ~306 KB**. Ahora la 2ª visita solo pide `index.html` y la API (~2,5 KB); el resto sale de caché.
+- **Fuentes autoalojadas**: elimina 2 handshakes DNS+TLS a `fonts.googleapis.com`/`fonts.gstatic.com` y permite servirlas con caché `immutable` propia. Son **variables**: un fichero por familia+subset cubre todos los pesos (declarados como rango, `font-weight: 400 700`). Con `unicode-range`, en es/en solo se descarga el subset `latin`.
+- **`Avatar.jpg` (50 KB) sustituye a `Avatar.png` (189 KB)**: la foto la sirve el `<picture>` como webp (14 KB) a casi todos los navegadores; el JPEG es el respaldo y el `og:image`. PNG es mal formato para un retrato.
+- **Compresión**: no se activa `server.compression` porque **Railway ya comprime en su proxy** (verificado: `Content-Encoding: gzip` con `Server: railway-hikari`). Activarla en el origen no aportaría nada al usuario; haría falta si se cambia de hosting.
+- **No se hizo code splitting** (es una sola página) ni se sustituyó React por Preact (~30 KB gzip de ahorro, pero riesgo alto para el valor).
 
 ## Convenciones
 

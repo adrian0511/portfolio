@@ -1,3 +1,6 @@
+/* Vite lo inlinea en el mismo bundle de CSS, así que no añade una petición. */
+@import './fonts.css';
+
 /* ════ RESET & VARS ════ */
 *,
 *::before,

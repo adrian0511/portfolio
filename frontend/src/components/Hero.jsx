@@ -39,9 +39,12 @@ export default function Hero() {
               <picture>
                 <source srcSet="/img/Avatar.webp" type="image/webp" />
                 <img
-                  src="/img/Avatar.png"
+                  src="/img/Avatar.jpg"
                   alt="Adrián Garcés"
                   id="profile-img"
+                  width="800"
+                  height="800"
+                  fetchPriority="high"
                   onError={() => setImgError(true)}
                 />
               </picture>

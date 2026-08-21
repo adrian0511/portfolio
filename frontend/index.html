@@ -24,7 +24,7 @@
   <meta property="og:title" content="Adrián Garcés (adrian0511) — Backend Developer" />
   <meta property="og:description"
     content="APIs y arquitecturas distribuidas con Java &amp; Spring. Microservicios, Kafka, seguridad; explorando Python y Node.js." />
-  <meta property="og:image" content="https://adrian0511.dev/img/Avatar.png" />
+  <meta property="og:image" content="https://adrian0511.dev/img/Avatar.jpg" />
   <meta property="og:image:width" content="800" />
   <meta property="og:image:height" content="800" />
   <meta property="og:image:alt" content="Adrián Garcés, desarrollador backend" />
@@ -34,15 +34,15 @@
   <meta name="twitter:title" content="Adrián Garcés (adrian0511) — Backend Developer" />
   <meta name="twitter:description"
     content="APIs y arquitecturas distribuidas con Java &amp; Spring. Microservicios, Kafka, seguridad; explorando Python y Node.js." />
-  <meta name="twitter:image" content="https://adrian0511.dev/img/Avatar.png" />
+  <meta name="twitter:image" content="https://adrian0511.dev/img/Avatar.jpg" />
 
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@700;800&display=swap"
-    rel="stylesheet" />
+  <!-- Fuentes autoalojadas (ver src/styles/fonts.css). Se precargan solo las dos
+       que se ven al cargar: el cuerpo en JetBrains Mono y el titular en Syne. -->
+  <link rel="preload" href="/fonts/JetBrainsMono-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/Syne-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/img/Avatar.webp" as="image" type="image/webp" />
 
   <script type="application/ld+json">
   {
@@ -68,7 +68,7 @@
         "additionalName": "Arsenio",
         "familyName": "Garcés Jiménez",
         "url": "https://adrian0511.dev/",
-        "image": "https://adrian0511.dev/img/Avatar.png",
+        "image": "https://adrian0511.dev/img/Avatar.jpg",
         "jobTitle": "Backend Developer",
         "email": "adriangarces0310@gmail.com",
         "description": "Desarrollador backend especializado en APIs y arquitecturas distribuidas con Java y Spring.",
@@ -93,7 +93,7 @@
         "name": "Adrián Garcés (adrian0511) — Backend Developer",
         "isPartOf": { "@id": "https://adrian0511.dev/#website" },
         "mainEntity": { "@id": "https://adrian0511.dev/#adrian" },
-        "primaryImageOfPage": "https://adrian0511.dev/img/Avatar.png",
+        "primaryImageOfPage": "https://adrian0511.dev/img/Avatar.jpg",
         "inLanguage": "es",
         "dateCreated": "2026-03-22T22:49:40-04:00",
         "dateModified": "%BUILD_TIME%"

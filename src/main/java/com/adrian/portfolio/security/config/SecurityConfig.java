@@ -16,8 +16,8 @@ public class SecurityConfig {
     private static final String CSP = String.join("; ",
             "default-src 'self'",
             "script-src 'self'",
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "font-src 'self' https://fonts.gstatic.com",
+            "style-src 'self' 'unsafe-inline'",
+            "font-src 'self'",
             "img-src 'self' data:",
             "connect-src 'self'",
             "base-uri 'self'",
@@ -32,6 +32,9 @@ public class SecurityConfig {
         return http
                 .csrf(csrf -> csrf.disable())
                 .headers(headers -> headers
+                        // Su política por defecto (no-store en todo) impedía cachear
+                        // los estáticos; CacheControlFilter la sustituye por ruta.
+                        .cache(cache -> cache.disable())
                         .contentSecurityPolicy(csp -> csp.policyDirectives(CSP)))
                 .authorizeExchange(exchanges -> exchanges
                         .anyExchange().permitAll())
