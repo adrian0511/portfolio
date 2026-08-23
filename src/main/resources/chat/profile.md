@@ -15,6 +15,12 @@ que el chat sepa más; no hace falta tocar código.
 - Email: adriangarces0310@gmail.com
 - Situación: abierto a ofertas laborales
 
+## Formación
+
+- **Bachillerato** completado.
+- Desde **septiembre de 2026** cursa el ciclo formativo de grado superior de
+  **Desarrollo de Aplicaciones Web (DAW)**. Sigue estudiándolo actualmente.
+
 ## Enfoque profesional
 
 Desarrollador backend centrado en construir APIs robustas y sistemas bien
@@ -65,7 +71,8 @@ PostgreSQL y autenticación JWT.
 
 ## Cosas que este perfil NO contiene
 
-No hay información sobre: años de experiencia concretos, formación académica,
-empresas en las que ha trabajado, pretensiones salariales, disponibilidad
-geográfica ni datos personales más allá de los de contacto. Si preguntan por
-algo de esto, hay que decir que no consta y derivar al email.
+No hay información sobre: años de experiencia concretos, empresas en las que ha
+trabajado, pretensiones salariales, disponibilidad geográfica ni datos
+personales más allá de los de contacto. Tampoco hay más formación que la
+recogida arriba. Si preguntan por algo de esto, hay que decir que no consta y
+derivar al email.

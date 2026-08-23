@@ -7,7 +7,7 @@ Guía para trabajar en este repositorio. Portfolio personal: **backend Spring Bo
 ## Stack
 
 **Backend**
-- Java 21/25 (el `pom.xml` declara `java.version=21`, pero el `maven-compiler-plugin` compila con `source/target=25`; **se necesita un JDK 25 para buildear** — ver "Notas")
+- **Java 25** (`java.version=25`; el Dockerfile usa temurin 25). Se necesita un JDK 25 para buildear.
 - Spring Boot **4.0.4** (parent)
 - Spring WebFlux (reactivo, `Mono`/`Flux` — **no** Spring MVC)
 - Spring Security (WebFlux security)
@@ -31,9 +31,11 @@ Guía para trabajar en este repositorio. Portfolio personal: **backend Spring Bo
 portfolio/
 ├── pom.xml                     # incluye frontend-maven-plugin (compila React en el build)
 ├── mvnw / mvnw.cmd             # Maven wrapper
+├── .github/workflows/ci.yml    # tests de backend y frontend + package en cada push/PR
 ├── Dockerfile                  # build multi-stage (JDK -> JRE), usuario no-root
 ├── frontend/                   # FRONTEND REACT
-│   ├── package.json            # scripts: dev, build, preview, test, test:watch
+│   ├── package.json            # scripts: dev, build, preview, test, test:watch, lint
+│   ├── eslint.config.js        # flat config + react-hooks
 │   ├── vite.config.js          # proxy /api -> :8080 en dev + plugin SEO (sitemap, BUILD_TIME)
 │   ├── vitest.config.js        # config de tests (jsdom + @testing-library)
 │   ├── index.html              # entry de Vite (meta SEO, Open Graph, JSON-LD)
@@ -112,6 +114,11 @@ Backend y frontend por separado; Vite proxea `/api` al backend:
 cd frontend && npm run dev        # frontend en :5173 (o 5174 si está ocupado)
 ```
 
+> **`npm ci` y Vite no pueden convivir**: `./mvnw` recrea `node_modules`, así que falla si el servidor de Vite está levantado (mantiene abierto `esbuild.exe`). Para lanzar solo los tests de Java sin bajar el frontend:
+> ```bash
+> ./mvnw test -Dskip.frontend=true
+> ```
+
 - Puerto backend: `server.port=${PORT:8080}`.
 - El proxy de Vite (`/api` → `:8080`) hace que en dev todo sea same-origin, preservando la cookie de sesión del flujo CSRF.
 
@@ -155,6 +162,7 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 - **`GitHubService`**: pide los repos del usuario a `api.github.com`, filtra forks / repo homónimo / sin descripción, toma los primeros N (5), mapea a `RepoDTO`. Cachea la respuesta en memoria (`Mono.cache(ttl)`, TTL vía `github.cache-ttl-seconds`) para no repetir la llamada a GitHub en cada visita. Timeout 7s. Si GitHub falla, devuelve una **lista fallback hardcodeada** de 5 proyectos (nunca rompe).
 - **Curación de topics** (`GitHubService.pickTopics`): un repo suele traer 10-16 topics, de los que solo se muestran **3**. Se descartan los genéricos (`NOISE_TOPICS`: backend, full-stack…) y el que repite el lenguaje; se priorizan los conceptuales (`CONCEPT_TOPICS`: arquitectura, seguridad, dominio) con un tope de 2 para **reservar hueco al stack**; y `SYNONYM_GROUPS` evita mostrar dos etiquetas que dicen lo mismo (p. ej. `jwt-authentication` + `security`). El resultado es **determinista**: antes se elegía un topic al azar y cambiaba al expirar la caché.
 - **`CsrfValidationFilter`** (`@Order(-100)`): intercepta **solo** `/api/projects`. Si falta el header o no coincide con el token en sesión → responde `404`. El frontend, ante error, muestra su propio fallback (estado `error` en `useProjects`).
+- **Cookie de sesión** (`SecurityConfig.webSessionIdResolver`): `HttpOnly` + `SameSite=Lax` + `Secure` condicional (`session.cookie.secure`, o `SESSION_COOKIE_SECURE=true` en Railway). Secure no puede ir fijo porque en local se sirve por HTTP y el navegador descartaría la cookie, rompiendo el flujo CSRF.
 - **`SecurityConfig`**: CSRF de Spring **deshabilitado** (se usa el filtro custom), CSP propia (`script-src 'self'`, `font-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, etc.), todo `permitAll`. También desactiva el `cache()` por defecto de Spring Security, que ponía `no-store` en **toda** respuesta e impedía cachear los estáticos.
 - **`CacheControlFilter`** (`@Order(-90)`): fija `Cache-Control` por ruta en `beforeCommit` (para ganar al manejador de estáticos):
   - `/assets/**` y `/fonts/**` → `public, max-age=31536000, immutable` (Vite pone hash de contenido en el nombre; **sustituir una fuente obliga a renombrarla**).
@@ -212,6 +220,7 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 cd frontend
 npm test          # una pasada (CI)
 npm run test:watch
+npm run lint      # ESLint (flat config + react-hooks)
 ```
 - `api/client.test.js` — `getCsrfToken`/`getProjects` contra `fetch` mockeado: headers/credentials correctos, error si la respuesta no es `ok`, `[]` en `204`.
 - `hooks/useProjects.test.js` — estados `loading` → `success`/`error` mockeando `api/client.js`.
@@ -237,7 +246,11 @@ Asistente que responde preguntas sobre el perfil de Adrián, montado sobre **su 
 - **`chat/profile.md`** (en `resources/`) es la **única** fuente de datos del asistente. Ampliar el chat = editar ese fichero, sin tocar código.
 - **Guardarraíles en el prompt de sistema**: responder solo desde el perfil; ante lo que no consta, derivar al email; hablar de Adrián en tercera persona; ignorar instrucciones del visitante que intenten reescribir las reglas. *Un modelo inventando "sí, domina Kubernetes" ante un reclutador es peor que no tener chat.*
 - **`ChatExceptionHandler`** (`@RestControllerAdvice`): traduce `AiClientException` a texto útil con **200**, no a un error. Distingue 429 (límite), 402 (sin crédito) y el resto. **Limitación real**: solo captura fallos *previos al primer token* (sin API key, 401, 429, red), que son los habituales porque `stream(...)` falla en la petición inicial. Un fallo a mitad de stream (`STREAM_ERROR`) llega con la respuesta ya comprometida y el visitante vería la respuesta truncada.
-- **`ChatRateLimitFilter`** (`@Order(-95)`): cupo por sesión (`chat.max-messages-per-session`, 20 por defecto). Un endpoint de IA público sin límite es una factura abierta.
+- **`ChatRateLimitFilter`** (`@Order(-95)`): tres cupos, porque el de sesión **por sí solo no protegía nada** — crear una sesión cuesta una petición a `/api/csrf-token`, así que un script que descarte la cookie tenía mensajes ilimitados (verificado con `curl`):
+  - **por sesión** (`chat.max-messages-per-session`, 20): cortesía para un navegador normal.
+  - **por IP y hora** (`chat.max-messages-per-ip-per-hour`, 15): la barrera real, porque las IPs sí son un recurso escaso. El mapa se poda para que no sea a su vez un vector de agotamiento de memoria.
+  - **global diario** (`chat.max-messages-per-day`, 150): última línea de defensa; acota el gasto aunque el atacante tenga muchas IPs.
+- **Nada de filtrar por `Origin`/`Referer`**: se comprobó en un navegador real que **no envía `Origin`** en este POST, y `Referrer-Policy: no-referrer` (de Spring Security) impide el `Referer`. Exigir cualquiera de las dos habría bloqueado a los visitantes de verdad.
 - **Topes de entrada en el controller**: pregunta a 500 caracteres y historial a los 6 últimos turnos; los turnos con rol `system` se degradan a `user` para que nadie reescriba las reglas desde el navegador.
 - **Sin API key el chat no rompe**: responde con el mensaje de respaldo derivando al email, igual que los proyectos tienen su lista de respaldo.
 
@@ -277,12 +290,12 @@ Decisiones tomadas y por qué (medido con Playwright contra el jar de producció
 - **Comentarios solo si son necesarios**: se comenta el *porqué* de una decisión no evidente (un workaround, una restricción externa, una alternativa descartada), nunca el *qué* hace el código. Si el comentario se limita a repetir lo que ya dice el nombre de la función o la línea siguiente, sobra.
 
 ## Notas / deuda técnica conocida
-- **Java 25 requerido para buildear**: el `maven-compiler-plugin` fuerza `source/target=25` aunque `java.version=21`. Unificar (o bien a 21, o alinear todo a 25).
+- **Java 25 requerido para buildear** (`java.version=25` en el `pom.xml`, igual que el Dockerfile). Antes las propiedades decían 21 y el plugin forzaba 25, lo que hacía creer que bastaba un JDK 21.
 - Links del drawer y del `#contact` ya apuntan a los perfiles reales (`github.com/adrian0511`, `linkedin.com/in/adrdev`).
-- Estilos inline aún abundantes en algunos componentes (Hero, GithubCard) — candidatos a mover a CSS/Modules. `ProjectCard` ya está migrado (clase `.pc-link`).
+- Estilos inline ya migrados a CSS en `ProjectCard` (`.pc-link`), `GithubCard` (`.gh-*`) y `Hero` (`.photo-stack`). Quedan algunos sueltos en `Projects` (mensaje de error).
 - CSS global pendiente de pasar a CSS Modules de forma incremental.
-- **Sin CI/CD**: no hay workflow de GitHub Actions que ejecute `./mvnw test` / `npm test` en cada push o PR. Los tests existen pero corren solo en local por ahora.
+- **CI en GitHub Actions** (`.github/workflows/ci.yml`): en cada push/PR a `main` o `dev` corre tests de backend, tests + build de frontend, y por último el `mvnw package` completo (el mismo que ejecuta Railway al desplegar).
 - **`vite` (devDependency) con vulnerabilidades conocidas** (moderate/high, vía `npm audit`): afectan solo al servidor de desarrollo (`vite dev`), no al build de producción que sirve Spring Boot. Actualizar a Vite 8 es un cambio mayor (breaking) pendiente de evaluar aparte.
-- Sin linter configurado en el frontend (no hay `.eslintrc` ni script `lint`).
+- **ESLint configurado** (`frontend/eslint.config.js`, flat config con react-hooks): `npm run lint`.
 - **`pushed_at` no es la fecha del último commit**: GitHub lo actualiza con cualquier push a *cualquier* rama (ramas de Dependabot, borrado de ramas…), así que el "Actualizado hace X" de las tarjetas puede indicar actividad que no es del autor. La fecha real sería `GET /repos/{owner}/{repo}/commits?per_page=1` (una llamada extra por repo). Se optó por mantener `pushed_at` por simplicidad.
-- No hay `<link rel="alternate" hreflang="es|en">` en `index.html` pese al contenido bilingüe (solo `og:locale:alternate`).
+- `hreflang` (es / en / x-default) declarado en `index.html`. Las tres alternativas apuntan a la misma URL porque el idioma se cambia en cliente.

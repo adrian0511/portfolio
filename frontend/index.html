@@ -14,6 +14,13 @@
   <meta name="theme-color" content="#07080d" />
 
   <link rel="canonical" href="https://adrian0511.dev/" />
+
+  <!-- Una sola URL sirve ambos idiomas (el selector cambia el texto en cliente),
+       así que las tres alternativas apuntan a la misma dirección. Sin esto, un
+       buscador no sabe que el contenido existe también en inglés. -->
+  <link rel="alternate" hreflang="es" href="https://adrian0511.dev/" />
+  <link rel="alternate" hreflang="en" href="https://adrian0511.dev/" />
+  <link rel="alternate" hreflang="x-default" href="https://adrian0511.dev/" />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
 
   <meta property="og:type" content="website" />

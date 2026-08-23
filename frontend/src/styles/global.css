@@ -1465,3 +1465,40 @@ footer {
 .chat-msg.assistant {
     white-space: normal;
 }
+
+/* Tarjeta "más proyectos en GitHub" (antes con estilos inline en el JSX). */
+.gh-card {
+    border: 1px dashed var(--border2);
+    background: transparent;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: .5rem;
+    min-height: 180px;
+}
+
+.gh-plus {
+    font-size: 1.3rem;
+    color: var(--muted);
+}
+
+.gh-more {
+    font-size: .72rem;
+    color: var(--muted2);
+}
+
+.gh-link {
+    font-size: .63rem;
+    color: var(--accent);
+    text-decoration: none;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-top: .35rem;
+}
+
+/* Contenedor de la foto: posiciona los corchetes decorativos (antes inline). */
+.photo-stack {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
