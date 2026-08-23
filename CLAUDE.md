@@ -8,7 +8,7 @@ Guía para trabajar en este repositorio. Portfolio personal: **backend Spring Bo
 
 **Backend**
 - **Java 25** (`java.version=25`; el Dockerfile usa temurin 25). Se necesita un JDK 25 para buildear.
-- Spring Boot **4.0.4** (parent)
+- Spring Boot **4.0.8** (parent) — **fijado a la línea 4.0.x**, ver "Notas"
 - Spring WebFlux (reactivo, `Mono`/`Flux` — **no** Spring MVC)
 - Spring Security (WebFlux security)
 - Lombok
@@ -295,6 +295,7 @@ Decisiones tomadas y por qué (medido con Playwright contra el jar de producció
 - Estilos inline ya migrados a CSS en `ProjectCard` (`.pc-link`), `GithubCard` (`.gh-*`) y `Hero` (`.photo-stack`). Quedan algunos sueltos en `Projects` (mensaje de error).
 - CSS global pendiente de pasar a CSS Modules de forma incremental.
 - **CI en GitHub Actions** (`.github/workflows/ci.yml`): en cada push/PR a `main` o `dev` corre tests de backend, tests + build de frontend, y por último el `mvnw package` completo (el mismo que ejecuta Railway al desplegar).
+- **No se puede subir a Spring Boot 4.1.x**: `prompt-link` arrastra Spring Cloud OpenFeign, y el verificador de compatibilidad de Spring Cloud 2025.1.x aborta el arranque con *"Spring Boot [4.1.1] is not compatible with this Spring Cloud release train — change to [4.0.x]"*. Comprobado: con 4.1.1 fallan los 4 tests que levantan contexto (los unitarios pasan, porque no arrancan Spring). Para subir habría que actualizar antes `prompt-link` a un release train de Spring Cloud compatible con Boot 4.1. **4.0.8 es la última versión usable.**
 - **`vite` (devDependency) con vulnerabilidades conocidas** (moderate/high, vía `npm audit`): afectan solo al servidor de desarrollo (`vite dev`), no al build de producción que sirve Spring Boot. Actualizar a Vite 8 es un cambio mayor (breaking) pendiente de evaluar aparte.
 - **ESLint configurado** (`frontend/eslint.config.js`, flat config con react-hooks): `npm run lint`.
 - **`pushed_at` no es la fecha del último commit**: GitHub lo actualiza con cualquier push a *cualquier* rama (ramas de Dependabot, borrado de ramas…), así que el "Actualizado hace X" de las tarjetas puede indicar actividad que no es del autor. La fecha real sería `GET /repos/{owner}/{repo}/commits?per_page=1` (una llamada extra por repo). Se optó por mantener `pushed_at` por simplicidad.
