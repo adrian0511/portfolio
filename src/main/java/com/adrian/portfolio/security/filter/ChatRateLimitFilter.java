@@ -90,7 +90,10 @@ public class ChatRateLimitFilter implements WebFilter {
      */
     private String clientIp(ServerWebExchange exchange) {
         var address = exchange.getRequest().getRemoteAddress();
-        return address == null ? "desconocida" : address.getAddress().getHostAddress();
+        // getHostString() y no getAddress().getHostAddress(): detrás del proxy la
+        // dirección viene SIN resolver (createUnresolved a partir del
+        // X-Forwarded-For) y getAddress() devuelve null.
+        return address == null ? "desconocida" : address.getHostString();
     }
 
     private boolean dailyBudgetSpent() {

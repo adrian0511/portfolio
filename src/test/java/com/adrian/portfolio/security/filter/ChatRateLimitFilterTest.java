@@ -108,6 +108,46 @@ class ChatRateLimitFilterTest {
     }
 
     @Test
+    void funcionaConDireccionesSinResolver() {
+        // Detrás del proxy de Railway, Spring construye la dirección a partir de
+        // X-Forwarded-For con InetSocketAddress.createUnresolved(...), y en ese
+        // caso getAddress() devuelve null. Usarlo sin comprobarlo tumbaba el
+        // chat en producción con un 500 en cada petición.
+        ChatRateLimitFilter filter = new ChatRateLimitFilter(SIN_LIMITE, 2, SIN_LIMITE);
+
+        MockServerWebExchange first = MockServerWebExchange.builder(
+                MockServerHttpRequest.post("/api/chat")
+                        .remoteAddress(java.net.InetSocketAddress.createUnresolved("203.0.113.7", 443)))
+                .session(newSession()).build();
+
+        filter.filter(first, chain).block();
+
+        assertThat(first.getResponse().getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(reachedChain.get()).isEqualTo(1);
+    }
+
+    @Test
+    void elCupoPorIpTambienCuentaConDireccionesSinResolver() {
+        ChatRateLimitFilter filter = new ChatRateLimitFilter(SIN_LIMITE, 2, SIN_LIMITE);
+
+        for (int i = 0; i < 2; i++) {
+            filter.filter(MockServerWebExchange.builder(
+                    MockServerHttpRequest.post("/api/chat")
+                            .remoteAddress(java.net.InetSocketAddress.createUnresolved("203.0.113.7", 443)))
+                    .session(newSession()).build(), chain).block();
+        }
+
+        MockServerWebExchange rejected = MockServerWebExchange.builder(
+                MockServerHttpRequest.post("/api/chat")
+                        .remoteAddress(java.net.InetSocketAddress.createUnresolved("203.0.113.7", 443)))
+                .session(newSession()).build();
+        filter.filter(rejected, chain).block();
+
+        assertThat(rejected.getResponse().getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(reachedChain.get()).isEqualTo(2);
+    }
+
+    @Test
     void otrasRutasNoConsumenCupo() {
         ChatRateLimitFilter filter = new ChatRateLimitFilter(1, 1, 1);
         WebSession session = newSession();
