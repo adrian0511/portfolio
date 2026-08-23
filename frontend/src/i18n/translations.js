@@ -9,6 +9,7 @@ export const translations = {
       about: 'Sobre mí',
       projects: 'Proyectos',
       contact: 'Contacto',
+      chat: 'Preguntar a la IA',
       menu: 'Menú',
     },
     hero: {
@@ -84,6 +85,7 @@ export const translations = {
       about: 'About',
       projects: 'Projects',
       contact: 'Contact',
+      chat: 'Ask the AI',
       menu: 'Menu',
     },
     hero: {

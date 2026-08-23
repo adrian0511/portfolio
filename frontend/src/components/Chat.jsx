@@ -4,9 +4,9 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import useChat from '../hooks/useChat.js'
 import ChatText from './ChatText.jsx'
 
-export default function Chat() {
+// El estado abierto/cerrado vive en App: el menu movil tambien abre el chat.
+export default function Chat({ open, onOpenChange: setOpen, hidden = false }) {
   const { t } = useLanguage()
-  const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const { messages, sending, send } = useChat(t)
   const logRef = useRef(null)
@@ -18,7 +18,7 @@ export default function Chat() {
     document.addEventListener('keydown', onKey)
     inputRef.current?.focus()
     return () => document.removeEventListener('keydown', onKey)
-  }, [open])
+  }, [open, setOpen])
 
   // Seguir el texto según se genera, sin que el usuario tenga que desplazarse.
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function Chat() {
   return (
     <>
       <button
-        className={`chat-launcher${open ? ' hidden' : ''}`}
+        className={`chat-launcher${open || hidden ? ' hidden' : ''}`}
         onClick={() => setOpen(true)}
         aria-label={t.chat.open}
       >

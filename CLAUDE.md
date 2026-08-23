@@ -94,6 +94,26 @@ portfolio/
 
 ---
 
+## Flujo de trabajo con git
+
+**Todo cambio se hace en `dev` y llega a `main` por merge.** Nunca se commitea
+directamente en `main`.
+
+```bash
+git checkout dev
+git merge main            # partir de lo ultimo publicado
+# ... trabajo, commits ...
+git push origin dev       # el CI corre sobre dev
+
+git checkout main
+git merge dev             # merge, no rebase ni cherry-pick
+git push origin main      # Railway despliega desde main
+```
+
+`main` es la rama que despliega: lo que entra ahí sale a producción en cuanto
+Railway lo detecta. El CI corre en las dos ramas, así que un fallo se ve en
+`dev` antes de que llegue a `main`.
+
 ## Cómo se levanta el proyecto
 
 **Requisito:** un **JDK 25** disponible para `./mvnw` (ej. `export JAVA_HOME=/ruta/al/jdk-25`).
@@ -174,7 +194,7 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 - `CustomCursor` — cursor custom con lag (solo mouse fino).
 - `Navbar` — se vuelve sólido tras 40px de scroll; hamburguesa togglea el drawer; incluye `LanguageToggle`.
 - `LanguageToggle` — botones ES/EN (banderas SVG inline, no emoji) que llaman a `setLang` del `LanguageContext`.
-- `MobileDrawer` — drawer mobile (estado en `App`, cierra con Escape / al navegar).
+- `MobileDrawer` — drawer mobile (estado en `App`, cierra con Escape / al navegar). Incluye una entrada al chat de IA: en móvil el botón flotante es un icono fácil de pasar por alto, así que el menú es la segunda vía de entrada. Mientras el drawer está abierto, `App` esconde el botón flotante (`hidden`) para no duplicar la misma acción.
 - `Hero` — texto + foto (con `onError` → placeholder) + chips.
 - `About` — bio + grid de stack (dominado / aprendiendo / estudiando).
 - `Projects` + `ProjectCard` + `GithubCard` — tarjetas desde la API con fallback. `ProjectCard` muestra chip de lenguaje (logo de `react-icons` tintado con el color de linguist; punto de color como fallback si el lenguaje no tiene logo), título legible (`gym-reservas` → `Gym Reservas`, respetando nombres tipo `RetosConIA`), descripción recortada a 3 líneas (`-webkit-line-clamp`), chips de topics y "actualizado hace X" vía `Intl.RelativeTimeFormat` (sin cadenas de traducción propias para las unidades).
@@ -226,6 +246,8 @@ npm run lint      # ESLint (flat config + react-hooks)
 - `hooks/useProjects.test.js` — estados `loading` → `success`/`error` mockeando `api/client.js`.
 - `hooks/useRevealOnScroll.test.jsx` — `IntersectionObserver` mockeado: observa los `.rv` al montar, añade `.on` al intersectar, `disconnect()` al desmontar.
 - `i18n/LanguageContext.test.jsx` — detección de idioma (`localStorage` > navegador > default), `setLang` (persistencia, `<html lang>`, idiomas no soportados), error al usar `useLanguage` fuera del provider.
+- `components/MobileDrawer.test.jsx` — el menú móvil ofrece el chat (traducido) y avisa a `App` al pulsarlo.
+- `components/Chat.test.jsx` — el panel lo controla `App`: cerrado solo se ve el lanzador, `open` lo abre desde fuera y `hidden` esconde el lanzador con el menú abierto.
 - `components/RichText.test.jsx`, `LanguageToggle.test.jsx`, `Contact.test.jsx`, `Footer.test.jsx` — comportamiento observable: negritas → `<strong>`, botón de idioma activo/click, CV descargable por idioma, año dinámico.
 - `api/streamChat.test.js` — el parser SSE: reconstruye el texto, aguanta que un evento llegue troceado entre lecturas, une varias líneas `data:` de un mismo evento, y distingue 429 del resto.
 - `hooks/useChat.test.js` — turno de usuario + turno del asistente rellenándose con el stream, preguntas vacías ignoradas, token CSRF reutilizado, y mensajes de límite/error sin romper la UI.
@@ -266,6 +288,12 @@ Asistente que responde preguntas sobre el perfil de Adrián, montado sobre **su 
 - `ai.model=${AI_MODEL:google/gemma-4-31b-it:free}` — el tier gratuito de OpenRouter son **20 req/min y 50 req/día** (1.000/día si alguna vez se compran $10 en créditos). Al agotarse entra el mensaje de respaldo.
 - `ai.read-timeout=25s` — seguro **porque hay streaming**: el primer token llega rápido. En una llamada no-streaming OpenRouter no envía nada hasta terminar de generar, y 25s mataría respuestas largas.
 
+**En móvil**: el estado abierto/cerrado del chat vive en `App` (no dentro de
+`Chat`) porque lo abren dos sitios: el botón flotante y el menú hamburguesa. El
+panel pasa a ocupar el ancho de la pantalla por debajo de 520px y se mide en
+`dvh`, no en `vh`, para que la barra del navegador no deje el campo de escribir
+fuera de la parte visible.
+
 **Sin RAG a propósito**: el perfil son dos páginas y cabe entero en el prompt de sistema. Montar embeddings para eso sería sobreingeniería.
 
 ---
@@ -279,6 +307,20 @@ Decisiones tomadas y por qué (medido con Playwright contra el jar de producció
 - **`Avatar.jpg` (50 KB) sustituye a `Avatar.png` (189 KB)**: la foto la sirve el `<picture>` como webp (14 KB) a casi todos los navegadores; el JPEG es el respaldo y el `og:image`. PNG es mal formato para un retrato.
 - **Compresión**: no se activa `server.compression` porque **Railway ya comprime en su proxy** (verificado: `Content-Encoding: gzip` con `Server: railway-hikari`). Activarla en el origen no aportaría nada al usuario; haría falta si se cambia de hosting.
 - **No se hizo code splitting** (es una sola página) ni se sustituyó React por Preact (~30 KB gzip de ahorro, pero riesgo alto para el valor).
+
+### Desbordamiento lateral y viewport móvil
+
+`body { overflow-x: hidden }` **no basta**: el `overflow-x` de `body` se propaga
+al viewport, así que `body` deja de recortar y el navegador móvil ensancha el
+*layout viewport* hasta abarcar lo que sobresale. Con los glows decorativos
+(`.cglow`, 500px) el layout pasaba a 445px en una pantalla de 390: todo lo
+fijado a la derecha —el botón del chat— quedaba fuera de la pantalla, sin forma
+de pulsarlo. Se arregla con `html { overflow-x: clip }` y conteniendo el glow en
+su sección (`#contact { overflow: hidden }`, como ya hacía `#hero`).
+
+Se detecta midiendo `document.documentElement.scrollWidth` contra
+`visualViewport.width` en un navegador con emulación móvil real: en un viewport
+de escritorio estrecho el fallo **no aparece**, solo sale un scroll horizontal.
 
 ## Convenciones
 

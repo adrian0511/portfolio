@@ -12,6 +12,12 @@
 
 html {
     scroll-behavior: smooth;
+    /* clip y no hidden, y en html y no solo en body: el overflow-x de body se
+       propaga al viewport, asi que body deja de recortar y el navegador movil
+       ensancha el layout viewport hasta abarcar lo que sobresale (445px en un
+       movil de 390). Todo lo fijado a la derecha -el boton del chat- se iba
+       entonces fuera de la pantalla. */
+    overflow-x: clip;
 }
 
 :root {
@@ -309,6 +315,44 @@ nav.solid {
 }
 
 .drawer a:hover {
+    color: var(--accent);
+}
+
+/* El chat es un boton, no un ancla: no navega a ninguna seccion. Hereda el
+   tamano de los enlaces pero se marca con el acento porque es la unica accion
+   del menu. */
+.drawer-chat {
+    margin-top: 1.4rem;
+    display: inline-flex;
+    align-items: center;
+    gap: .6rem;
+    background: none;
+    border: 1px solid var(--border2);
+    padding: .7rem 1.2rem;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: border-color .2s, opacity .4s, transform .4s;
+}
+
+.drawer.open .drawer-chat {
+    opacity: 1;
+    transform: none;
+    transition-delay: .2s;
+}
+
+.drawer-chat:hover {
+    border-color: var(--accent);
+}
+
+.drawer-chat svg {
+    width: 14px;
+    height: 14px;
     color: var(--accent);
 }
 
@@ -906,6 +950,8 @@ h2 {
     margin: 0 auto;
     text-align: center;
     position: relative;
+    /* .cglow mide 500px y se sale por los lados, igual que el glow del hero. */
+    overflow: hidden;
 }
 
 .cglow {
@@ -1269,7 +1315,9 @@ footer {
     bottom: 1.4rem;
     z-index: 600;
     width: min(380px, calc(100vw - 2.8rem));
-    height: min(520px, calc(100vh - 2.8rem));
+    /* dvh y no vh: en movil la barra del navegador entra y sale, y con vh el
+       formulario de escribir queda por debajo del borde visible. */
+    height: min(520px, calc(100dvh - 2.8rem));
     display: flex;
     flex-direction: column;
     background: var(--surf);
@@ -1423,8 +1471,19 @@ footer {
         display: none;
     }
 
+    /* 44px es el minimo de area tactil recomendado; con .8rem se quedaba en 41. */
     .chat-launcher {
-        padding: .8rem;
+        padding: .9rem;
+    }
+
+    /* A lo ancho de la pantalla: en un movil un panel de 380px flotando en una
+       esquina desperdicia sitio y deja lineas de dos palabras. */
+    .chat-panel {
+        left: .8rem;
+        right: .8rem;
+        bottom: .8rem;
+        width: auto;
+        height: min(560px, calc(100dvh - 1.6rem - var(--nav-h)));
     }
 }
 

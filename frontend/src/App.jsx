@@ -12,6 +12,7 @@ import useRevealOnScroll from './hooks/useRevealOnScroll.js'
 
 export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
 
   useRevealOnScroll()
 
@@ -27,14 +28,22 @@ export default function App() {
   return (
     <>
       <CustomCursor />
-      <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <MobileDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onOpenChat={() => {
+          setDrawerOpen(false)
+          setChatOpen(true)
+        }}
+      />
       <Navbar drawerOpen={drawerOpen} onToggleDrawer={() => setDrawerOpen((v) => !v)} />
       <Hero />
       <About />
       <Projects />
       <Contact />
       <Footer />
-      <Chat />
+      {/* Con el menu abierto el boton flotante duplicaria la entrada al chat. */}
+      <Chat open={chatOpen} onOpenChange={setChatOpen} hidden={drawerOpen} />
     </>
   )
 }
