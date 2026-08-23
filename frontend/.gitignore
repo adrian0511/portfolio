@@ -3,3 +3,7 @@ dist
 dist-ssr
 *.local
 .vite
+
+# Vite inlinea las variables VITE_* en el bundle público: aquí NUNCA va un secreto.
+.env
+.env.*

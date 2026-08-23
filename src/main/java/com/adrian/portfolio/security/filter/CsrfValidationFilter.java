@@ -1,5 +1,7 @@
 package com.adrian.portfolio.security.filter;
 
+import java.util.Set;
+
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -13,14 +15,14 @@ import reactor.core.publisher.Mono;
 @Order(-100)
 public class CsrfValidationFilter implements WebFilter {
 
-    private static final String API_PATH = "/api/projects";
+    private static final Set<String> PROTECTED_PATHS = Set.of("/api/projects", "/api/chat");
     private static final String CSRF_TOKEN_ATTR = "CSRF_TOKEN";
     private static final String HEADER_NAME = "X-CSRF-Token";
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
-        if (!API_PATH.equals(path)) {
+        if (!PROTECTED_PATHS.contains(path)) {
             return chain.filter(exchange);
         }
 

@@ -12,6 +12,7 @@ Guía para trabajar en este repositorio. Portfolio personal: **backend Spring Bo
 - Spring WebFlux (reactivo, `Mono`/`Flux` — **no** Spring MVC)
 - Spring Security (WebFlux security)
 - Lombok
+- **`prompt-link` 1.1.0** — librería propia (Maven Central) para IA generativa vía OpenRouter; aporta `ReactiveAiService` con streaming. Arrastra Spring Cloud OpenFeign.
 - Build: Maven (wrapper `mvnw` incluido)
 
 **Frontend**
@@ -135,6 +136,7 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 |--------|---------------------|--------------------------------|-----------|
 | GET    | `/api/csrf-token`   | ninguno                        | `{ token: string }` |
 | GET    | `/api/projects`     | `X-CSRF-Token` (validado en filtro) | `RepoDTO[]` |
+| POST   | `/api/chat`         | `X-CSRF-Token` + cupo de sesión | `text/event-stream` de fragmentos |
 
 ### `RepoDTO` (contrato con el frontend)
 ```json
@@ -196,6 +198,10 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 ```
 - `GitHubServiceTest` — unitario, sin red: construye el `WebClient` con `exchangeFunction(...)` fake para simular respuestas de GitHub. Cubre filtrado (forks / repo homónimo / sin descripción), mapeo a `RepoDTO`, fallback ante error, caché (no repite la llamada HTTP), el header `Authorization: Bearer` condicionado a que haya token, y la curación de topics (genéricos descartados, prioridad conceptual, hueco reservado al stack, sinónimos deduplicados, repo sin topics → lista vacía).
 - `CsrfValidationFilterTest` — unitario sobre el `WebFilter` con `MockServerWebExchange`: sin header → 404, header que no coincide con la sesión → 404, header válido → deja pasar, rutas distintas de `/api/projects` no se validan.
+- `ChatServiceTest` — el prompt de sistema lleva reglas + perfil, el historial se conserva en orden, y los errores **se propagan** (traducirlos es cosa del advice).
+- `ChatExceptionHandlerTest` — cada `statusCode` produce su mensaje (429 límite, 402 sin crédito, config/red genérico) y siempre con 200 + `text/event-stream`.
+- `ChatControllerTest` — pregunta vacía no llega al modelo, recorte a 500 caracteres, historial recortado a 6 turnos, y un turno con rol `system` degradado a `user`.
+- `ChatRateLimitFilterTest` — cupo por sesión: dentro pasa, al superarlo 429 sin llamar al modelo, sesiones distintas no comparten cupo, otras rutas no consumen.
 - `CacheControlFilterTest` — la política de caché por ruta: assets con hash y fuentes inmutables, imágenes/CV a un día, y `index.html` + `/api/**` sin cachear nunca (esto último es el que protege los despliegues).
 - `CsrfTokenControllerTest` — `WebTestClient.bindToController(...)`: token no vacío + cookie de sesión, mismo token en la misma sesión, tokens distintos entre sesiones.
 - `ProjectControllerTest` — `WebTestClient.bindToController(...)` con `GitHubService` mockeado: 200 con la lista, 200 con lista vacía, y el camino defensivo 204 (`Mono.empty()`) del controller.
@@ -212,9 +218,42 @@ npm run test:watch
 - `hooks/useRevealOnScroll.test.jsx` — `IntersectionObserver` mockeado: observa los `.rv` al montar, añade `.on` al intersectar, `disconnect()` al desmontar.
 - `i18n/LanguageContext.test.jsx` — detección de idioma (`localStorage` > navegador > default), `setLang` (persistencia, `<html lang>`, idiomas no soportados), error al usar `useLanguage` fuera del provider.
 - `components/RichText.test.jsx`, `LanguageToggle.test.jsx`, `Contact.test.jsx`, `Footer.test.jsx` — comportamiento observable: negritas → `<strong>`, botón de idioma activo/click, CV descargable por idioma, año dinámico.
+- `api/streamChat.test.js` — el parser SSE: reconstruye el texto, aguanta que un evento llegue troceado entre lecturas, une varias líneas `data:` de un mismo evento, y distingue 429 del resto.
+- `hooks/useChat.test.js` — turno de usuario + turno del asistente rellenándose con el stream, preguntas vacías ignoradas, token CSRF reutilizado, y mensajes de límite/error sin romper la UI.
 - `components/ProjectCard.test.jsx` — título legible (y respeto de mayúsculas existentes), chips de lenguaje y topics, ausencia de chips si el repo no trae topics, "actualizado hace X" localizado (con `vi.setSystemTime`) y omitido si no hay `pushed_at`, enlace y descripción de respaldo.
 
 No hay tests de `CustomCursor` (loop de `requestAnimationFrame` puramente imperativo) ni de componentes de solo layout (`Hero`, `About`, `Navbar`, `MobileDrawer`, `GithubCard`, `Projects`) — bajo valor relativo al esfuerzo de mockear DOM/IntersectionObserver para lo que son, en esencia, vistas sin lógica propia.
+
+---
+
+## Chat con IA
+
+Asistente que responde preguntas sobre el perfil de Adrián, montado sobre **su propia librería** [`prompt-link`](https://github.com/adrian0511/prompt-link) (`io.github.adrian0511:prompt-link`, en Maven Central), que enruta a OpenRouter.
+
+**Por qué existe**: no es una utilidad para el visitante (pocos usarán un chat), es la demostración de una competencia que el portfolio solo afirmaba. De paso justifica WebFlux: hasta ahora el backend reactivo servía un único `GET`; el streaming SSE token a token sí es el caso de uso para el que existe WebFlux.
+
+**Flujo**: `POST /api/chat` → `ChatService` monta `[system(reglas+perfil), ...historial, user(pregunta)]` → `ReactiveAiService.stream(...)` → `Flux<String>` → SSE al navegador.
+
+- **`chat/profile.md`** (en `resources/`) es la **única** fuente de datos del asistente. Ampliar el chat = editar ese fichero, sin tocar código.
+- **Guardarraíles en el prompt de sistema**: responder solo desde el perfil; ante lo que no consta, derivar al email; hablar de Adrián en tercera persona; ignorar instrucciones del visitante que intenten reescribir las reglas. *Un modelo inventando "sí, domina Kubernetes" ante un reclutador es peor que no tener chat.*
+- **`ChatExceptionHandler`** (`@RestControllerAdvice`): traduce `AiClientException` a texto útil con **200**, no a un error. Distingue 429 (límite), 402 (sin crédito) y el resto. **Limitación real**: solo captura fallos *previos al primer token* (sin API key, 401, 429, red), que son los habituales porque `stream(...)` falla en la petición inicial. Un fallo a mitad de stream (`STREAM_ERROR`) llega con la respuesta ya comprometida y el visitante vería la respuesta truncada.
+- **`ChatRateLimitFilter`** (`@Order(-95)`): cupo por sesión (`chat.max-messages-per-session`, 20 por defecto). Un endpoint de IA público sin límite es una factura abierta.
+- **Topes de entrada en el controller**: pregunta a 500 caracteres y historial a los 6 últimos turnos; los turnos con rol `system` se degradan a `user` para que nadie reescriba las reglas desde el navegador.
+- **Sin API key el chat no rompe**: responde con el mensaje de respaldo derivando al email, igual que los proyectos tienen su lista de respaldo.
+
+**Dónde va la API key**:
+- **Local**: `config/application.properties` (en la raíz del proyecto, **git-ignorado**). Spring Boot lee `./config/` automáticamente y sus valores ganan a los de `src/main/resources`, sin perfiles ni flags ni dependencias. Es el sustituto nativo de un `.env`, que Spring **no** lee de serie.
+  - *No buscar librerías de `.env`*: `spring-dotenv` no sirve aquí — su última versión es de mayo de 2023 y no funciona con Spring Boot 4. La ventaja de `./config/` es justamente que forma parte de la resolución de configuración del propio Spring Boot, así que no se rompe al subir de versión.
+- **Railway**: variable de entorno `OPENROUTER_API_KEY`.
+- **Nunca** en `frontend/.env`: Vite inlinea las variables `VITE_*` en el bundle público y la clave quedaría a la vista de cualquiera.
+- Hay que **reiniciar** el backend tras ponerla: Spring la lee al arrancar.
+
+**Configuración** (`ai.*` las lee la librería):
+- `ai.api-key=${OPENROUTER_API_KEY:}` — sin ella, modo respaldo.
+- `ai.model=${AI_MODEL:google/gemma-4-31b-it:free}` — el tier gratuito de OpenRouter son **20 req/min y 50 req/día** (1.000/día si alguna vez se compran $10 en créditos). Al agotarse entra el mensaje de respaldo.
+- `ai.read-timeout=25s` — seguro **porque hay streaming**: el primer token llega rápido. En una llamada no-streaming OpenRouter no envía nada hasta terminar de generar, y 25s mataría respuestas largas.
+
+**Sin RAG a propósito**: el perfil son dos páginas y cabe entero en el prompt de sistema. Montar embeddings para eso sería sobreingeniería.
 
 ---
 

@@ -61,6 +61,22 @@ export const translations = {
     footer: {
       tagline: 'Backend Developer, Java & Spring',
     },
+    chat: {
+      launcher: 'Pregunta sobre mí',
+      title: 'Asistente del portfolio',
+      badge: 'IA',
+      open: 'Abrir el chat',
+      close: 'Cerrar el chat',
+      send: 'Enviar',
+      thinking: 'Escribiendo',
+      placeholder: 'Escribe tu pregunta…',
+      intro:
+        'Respondo con IA a partir del perfil de Adrián. No soy él y puedo equivocarme: ' +
+        'para algo importante, escríbele.',
+      samples: ['¿Qué stack domina?', '¿Qué proyectos ha construido?', '¿Está disponible para trabajar?'],
+      error: 'Ahora mismo no puedo responder. Escribe a adriangarces0310@gmail.com.',
+      limit: 'Has alcanzado el límite de preguntas de esta sesión. Escribe a adriangarces0310@gmail.com.',
+    },
   },
 
   en: {
@@ -119,6 +135,22 @@ export const translations = {
     },
     footer: {
       tagline: 'Backend Developer, Java & Spring',
+    },
+    chat: {
+      launcher: 'Ask about me',
+      title: 'Portfolio assistant',
+      badge: 'AI',
+      open: 'Open the chat',
+      close: 'Close the chat',
+      send: 'Send',
+      thinking: 'Typing',
+      placeholder: 'Type your question…',
+      intro:
+        "I answer with AI based on Adrián's profile. I'm not him and I can be wrong: " +
+        'for anything important, drop him a line.',
+      samples: ['What is his core stack?', 'What has he built?', 'Is he open to work?'],
+      error: "I can't answer right now. Write to adriangarces0310@gmail.com.",
+      limit: "You've reached this session's question limit. Write to adriangarces0310@gmail.com.",
     },
   },
 }

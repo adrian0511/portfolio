@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Secretos locales (NUNCA commitear) ###
+# Spring Boot lee ./config/application.properties automáticamente y sus valores
+# ganan a los del classpath: es el sitio para la API key en desarrollo.
+/config/
+.env
+.env.*
