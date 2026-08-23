@@ -152,6 +152,31 @@
                 </execution>
             </executions>
         </plugin>
+
+        <!-- Mockito ya no podra auto-adjuntarse como agente en JDKs futuros
+             (avisa en cada build). Se le pasa explicitamente con -javaagent; la
+             ruta al jar la publica dependency:properties. -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+                <execution>
+                    <id>mockito-agent-path</id>
+                    <phase>initialize</phase>
+                    <goals>
+                        <goal>properties</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+                <argLine>-javaagent:${org.mockito:mockito-core:jar}</argLine>
+            </configuration>
+        </plugin>
     </plugins>
 	</build>
 	

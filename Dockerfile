@@ -19,4 +19,6 @@ RUN groupadd -r app && useradd -r -g app app
 USER app
 
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# --enable-native-access: Netty usa metodos nativos restringidos y desde Java 24
+# eso emite un warning en cada arranque salvo que se autorice explicitamente.
+ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "app.jar"]
