@@ -27,9 +27,11 @@ jobs:
           cache: maven
 
       # El frontend se compila en su propio job; aquí se salta para que un fallo
-      # de npm no enmascare el resultado de los tests de Java.
+      # de npm no enmascare el resultado de los tests de Java. La propiedad es
+      # la del pom (-Dskip.frontend), no las del plugin: el pom fija <skip>
+      # explícitamente, así que -Dskip.npm no tenía ningún efecto.
       - name: mvnw test
-        run: ./mvnw -B test -Dskip.npm=true -Dskip.installnodenpm=true
+        run: ./mvnw -B test -Dskip.frontend=true
 
   frontend:
     name: Tests frontend (Vitest)
