@@ -1,8 +1,13 @@
 # Perfil de Adrián Garcés
 
-Este fichero es la ÚNICA fuente de datos del chat de la web. Todo lo que el
-asistente pueda afirmar tiene que estar escrito aquí. Ampliarlo es la forma de
-que el chat sepa más; no hace falta tocar código.
+Este fichero es la fuente de datos del chat de la web: todo lo que el asistente
+pueda afirmar sobre Adrián tiene que estar escrito aquí. Ampliarlo es la forma
+de que el chat sepa más; no hace falta tocar código.
+
+La única excepción es la lista de sus repositorios públicos, que el backend lee
+de la API de GitHub y añade al prompt en cada arranque de caché: así el chat
+conoce cualquier proyecto nuevo sin que haya que anotarlo a mano. Los de abajo
+son los que merecen contexto añadido, no la lista completa.
 
 ## Registro y tono del asistente
 
@@ -83,7 +88,10 @@ Resilience4j, OAuth2.
 Aprendiendo actualmente: Python, FastAPI, SQLAlchemy, Pydantic, NestJS,
 TypeScript, React, Sequelize.
 
-## Proyectos
+## Proyectos destacados
+
+Los que llevan explicación propia. La lista completa de repositorios llega
+aparte, desde GitHub.
 
 **prompt-link** — Librería Java publicada en **Maven Central**
 (`io.github.adrian0511:prompt-link`): cliente de IA generativa sobre OpenRouter

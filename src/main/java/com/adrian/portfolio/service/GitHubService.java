@@ -18,6 +18,7 @@ import com.adrian.portfolio.dto.GithubRepoResponse;
 import com.adrian.portfolio.dto.RepoDTO;
 
 import lombok.extern.log4j.Log4j2;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Service
@@ -63,18 +64,51 @@ public class GitHubService {
     private static final int MAX_TOPICS = 3;
     private static final int MAX_CONCEPT_TOPICS = 2;
 
+    // Clave imposible como limite real: reutiliza el mismo mapa y el mismo TTL
+    // que las tarjetas para cachear la lista completa que consume el chat.
+    private static final int ALL_REPOS = -1;
+    private static final int GITHUB_PAGE_SIZE = 100;
+
     public Mono<List<RepoDTO>> getFeaturedRepo(int limit) {
         return cache.computeIfAbsent(limit,
                 l -> fetchFeaturedRepo(l).cache(Duration.ofSeconds(cacheTtlSeconds)));
     }
 
+    /**
+     * Todos los repos publicos, sin recortar a los destacados: es lo que lee el
+     * chat para poder hablar de cualquier proyecto y no solo de los cinco que
+     * caben en la portada.
+     */
+    public Mono<List<RepoDTO>> getAllRepos() {
+        return cache.computeIfAbsent(ALL_REPOS,
+                key -> fetchRepos(GITHUB_PAGE_SIZE)
+                        .collectList()
+                        .timeout(Duration.ofSeconds(7))
+                        .onErrorResume(error -> {
+                            log.error("GitHub failed (lista completa): " + error.getMessage());
+                            return Mono.just(getFallBackRepos());
+                        })
+                        .cache(Duration.ofSeconds(cacheTtlSeconds)));
+    }
+
     private Mono<List<RepoDTO>> fetchFeaturedRepo(int limit) {
-        log.info("Cache miss: pidiendo repos a GitHub (limit={})", limit);
+        return fetchRepos(limit * 2)
+                .take(limit)
+                .collectList()
+                .timeout(Duration.ofSeconds(7))
+                .onErrorResume(error -> {
+                    log.error("GitHub failed: " + error.getMessage());
+                    return Mono.just(getFallBackRepos());
+                });
+    }
+
+    private Flux<RepoDTO> fetchRepos(int perPage) {
+        log.info("Cache miss: pidiendo repos a GitHub (per_page={})", perPage);
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/users/{username}/repos")
                         .queryParam("sort", "pushed")
-                        .queryParam("per_page", limit * 2)
+                        .queryParam("per_page", perPage)
                         .build(username))
                 .headers(headers -> {
                     if (!token.isBlank()) {
@@ -86,14 +120,7 @@ public class GitHubService {
                 .filter(repo -> !repo.getFork())
                 .filter(repo -> !repo.getName().equalsIgnoreCase(username))
                 .filter(repo -> repo.getDescription() != null)
-                .take(limit)
-                .map(this::toDTO)
-                .collectList()
-                .timeout(Duration.ofSeconds(7))
-                .onErrorResume(error -> {
-                    log.error("GitHub failed: " + error.getMessage());
-                    return Mono.just(getFallBackRepos());
-                });
+                .map(this::toDTO);
     }
 
     private RepoDTO toDTO(GithubRepoResponse repo) {

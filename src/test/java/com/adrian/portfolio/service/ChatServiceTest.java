@@ -2,14 +2,18 @@ package com.adrian.portfolio.service;
 
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+
+import com.adrian.portfolio.dto.RepoDTO;
 
 import io.github.adrian0511.prompt_link.dto.Message;
 import io.github.adrian0511.prompt_link.exceptions.AiClientException;
 import io.github.adrian0511.prompt_link.service.ReactiveAiService;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +25,20 @@ import static org.mockito.Mockito.when;
 class ChatServiceTest {
 
     private final ReactiveAiService aiService = mock(ReactiveAiService.class);
-    private final ChatService chatService = new ChatService(aiService);
+    private final GitHubService gitHubService = mock(GitHubService.class);
+    private final ChatService chatService = new ChatService(aiService, gitHubService);
+
+    private static final List<RepoDTO> REPOS = List.of(
+            new RepoDTO("orderflow", "Plataforma de pedidos con microservicios",
+                    "https://github.com/adrian0511/orderflow", "Java",
+                    List.of("microservices", "kafka"), null),
+            new RepoDTO("bug-hunt", "Rate limiter y acortador de URLs",
+                    "https://github.com/adrian0511/bug-hunt", "Python", List.of(), null));
+
+    @BeforeEach
+    void stubRepos() {
+        when(gitHubService.getAllRepos()).thenReturn(Mono.just(REPOS));
+    }
 
     @SuppressWarnings("unchecked")
     private List<Message> capturedConversation() {
@@ -55,6 +72,32 @@ class ChatServiceTest {
         assertThat(conversation.get(1).getContent()).isEqualTo("¿Sabe Java?");
         assertThat(conversation.get(2).getContent()).isEqualTo("Sí.");
         assertThat(conversation.get(3).getContent()).isEqualTo("¿Y Kafka?");
+    }
+
+    @Test
+    void meteLosRepositoriosDeGithubEnElPromptDeSistema() {
+        when(aiService.stream(anyList())).thenReturn(Flux.just("ok"));
+
+        chatService.answer("¿Qué ha construido?", List.of()).blockLast();
+
+        // El perfil solo detalla unos pocos; los demas llegan de GitHub, asi que
+        // el chat puede hablar de un repo nuevo sin tocar profile.md.
+        String system = capturedConversation().get(0).getContent();
+        assertThat(system).contains("orderflow", "microservices", "[Java]");
+        assertThat(system).contains("bug-hunt", "[Python]");
+    }
+
+    @Test
+    void recortaLasDescripcionesLargasParaNoInflarElPrompt() {
+        when(aiService.stream(anyList())).thenReturn(Flux.just("ok"));
+        when(gitHubService.getAllRepos()).thenReturn(Mono.just(List.of(
+                new RepoDTO("verboso", "x".repeat(400), "url", "Java", List.of(), null))));
+
+        chatService.answer("hola", List.of()).blockLast();
+
+        String system = capturedConversation().get(0).getContent();
+        assertThat(system).contains("x".repeat(220) + "…");
+        assertThat(system).doesNotContain("x".repeat(221));
     }
 
     @Test

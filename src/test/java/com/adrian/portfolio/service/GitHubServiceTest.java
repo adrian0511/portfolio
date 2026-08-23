@@ -146,6 +146,74 @@ class GitHubServiceTest {
     }
 
     @Test
+    void getAllRepos_devuelveTodosLosPublicosSinRecortarALosDestacados() {
+        // El chat necesita la lista entera: con solo los destacados no podria
+        // hablar de un proyecto que no cabe en la portada.
+        String json = """
+                [
+                  {"name":"uno","description":"d","html_url":"x","language":"Java","fork":false,"topics":[]},
+                  {"name":"dos","description":"d","html_url":"x","language":"Java","fork":false,"topics":[]},
+                  {"name":"tres","description":"d","html_url":"x","language":"Java","fork":false,"topics":[]},
+                  {"name":"cuatro","description":"d","html_url":"x","language":"Java","fork":false,"topics":[]},
+                  {"name":"cinco","description":"d","html_url":"x","language":"Java","fork":false,"topics":[]},
+                  {"name":"seis","description":"d","html_url":"x","language":"Java","fork":false,"topics":[]},
+                  {"name":"siete","description":"d","html_url":"x","language":"Java","fork":false,"topics":[]}
+                ]
+                """;
+
+        GitHubService service = buildService(webClientReturning(json), "");
+
+        assertThat(service.getAllRepos().block()).hasSize(7);
+    }
+
+    @Test
+    void getAllRepos_aplicaLosMismosFiltrosQueLasTarjetas() {
+        String json = """
+                [
+                  {"name":"adrian0511","description":"soy yo","html_url":"x","language":null,"fork":false,"topics":[]},
+                  {"name":"forked-repo","description":"desc","html_url":"x","language":"Java","fork":true,"topics":[]},
+                  {"name":"sin-desc","description":null,"html_url":"x","language":"Java","fork":false,"topics":[]},
+                  {"name":"bueno","description":"Un proyecto","html_url":"x","language":"Java","fork":false,"topics":[]}
+                ]
+                """;
+
+        GitHubService service = buildService(webClientReturning(json), "");
+
+        assertThat(service.getAllRepos().block())
+                .extracting(RepoDTO::getName)
+                .containsExactly("bueno");
+    }
+
+    @Test
+    void getAllRepos_cacheaYNoCompartePeticionConLasTarjetas() {
+        AtomicInteger calls = new AtomicInteger();
+        WebClient client = WebClient.builder()
+                .exchangeFunction(request -> {
+                    calls.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header("Content-Type", "application/json")
+                            .body("[{\"name\":\"uno\",\"description\":\"d\",\"html_url\":\"x\",\"language\":\"Java\",\"fork\":false,\"topics\":[]}]")
+                            .build());
+                })
+                .build();
+
+        GitHubService service = buildService(client, "");
+        service.getAllRepos().block();
+        service.getAllRepos().block();
+
+        assertThat(calls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void getAllRepos_siGithubFallaDevuelveLaListaDeRespaldo() {
+        WebClient client = WebClient.builder()
+                .exchangeFunction(request -> Mono.error(new RuntimeException("GitHub caído")))
+                .build();
+
+        assertThat(buildService(client, "").getAllRepos().block()).hasSize(5);
+    }
+
+    @Test
     void siGithubFalla_devuelveListaDeRespaldoDe5Repos() {
         WebClient client = WebClient.builder()
                 .exchangeFunction(request -> Mono.error(new RuntimeException("GitHub caído")))
