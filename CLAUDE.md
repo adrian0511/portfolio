@@ -7,11 +7,12 @@ Guía para trabajar en este repositorio. Portfolio personal: **backend Spring Bo
 ## Stack
 
 **Backend**
-- Java 21/25 (el `pom.xml` declara `java.version=21`, pero el `maven-compiler-plugin` compila con `source/target=25`; **se necesita un JDK 25 para buildear** — ver "Notas")
-- Spring Boot **4.0.4** (parent)
+- **Java 25** (`java.version=25`; el Dockerfile usa temurin 25). Se necesita un JDK 25 para buildear.
+- Spring Boot **4.0.8** (parent) — **fijado a la línea 4.0.x**, ver "Notas"
 - Spring WebFlux (reactivo, `Mono`/`Flux` — **no** Spring MVC)
 - Spring Security (WebFlux security)
 - Lombok
+- **`prompt-link` 1.1.0** — librería propia (Maven Central) para IA generativa vía OpenRouter; aporta `ReactiveAiService` con streaming. Arrastra Spring Cloud OpenFeign.
 - Build: Maven (wrapper `mvnw` incluido)
 
 **Frontend**
@@ -30,9 +31,11 @@ Guía para trabajar en este repositorio. Portfolio personal: **backend Spring Bo
 portfolio/
 ├── pom.xml                     # incluye frontend-maven-plugin (compila React en el build)
 ├── mvnw / mvnw.cmd             # Maven wrapper
+├── .github/workflows/ci.yml    # tests de backend y frontend + package en cada push/PR
 ├── Dockerfile                  # build multi-stage (JDK -> JRE), usuario no-root
 ├── frontend/                   # FRONTEND REACT
-│   ├── package.json            # scripts: dev, build, preview, test, test:watch
+│   ├── package.json            # scripts: dev, build, preview, test, test:watch, lint
+│   ├── eslint.config.js        # flat config + react-hooks
 │   ├── vite.config.js          # proxy /api -> :8080 en dev + plugin SEO (sitemap, BUILD_TIME)
 │   ├── vitest.config.js        # config de tests (jsdom + @testing-library)
 │   ├── index.html              # entry de Vite (meta SEO, Open Graph, JSON-LD)
@@ -111,6 +114,11 @@ Backend y frontend por separado; Vite proxea `/api` al backend:
 cd frontend && npm run dev        # frontend en :5173 (o 5174 si está ocupado)
 ```
 
+> **`npm ci` y Vite no pueden convivir**: `./mvnw` recrea `node_modules`, así que falla si el servidor de Vite está levantado (mantiene abierto `esbuild.exe`). Para lanzar solo los tests de Java sin bajar el frontend:
+> ```bash
+> ./mvnw test -Dskip.frontend=true
+> ```
+
 - Puerto backend: `server.port=${PORT:8080}`.
 - El proxy de Vite (`/api` → `:8080`) hace que en dev todo sea same-origin, preservando la cookie de sesión del flujo CSRF.
 
@@ -135,6 +143,7 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 |--------|---------------------|--------------------------------|-----------|
 | GET    | `/api/csrf-token`   | ninguno                        | `{ token: string }` |
 | GET    | `/api/projects`     | `X-CSRF-Token` (validado en filtro) | `RepoDTO[]` |
+| POST   | `/api/chat`         | `X-CSRF-Token` + cupo de sesión | `text/event-stream` de fragmentos |
 
 ### `RepoDTO` (contrato con el frontend)
 ```json
@@ -153,6 +162,7 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 - **`GitHubService`**: pide los repos del usuario a `api.github.com`, filtra forks / repo homónimo / sin descripción, toma los primeros N (5), mapea a `RepoDTO`. Cachea la respuesta en memoria (`Mono.cache(ttl)`, TTL vía `github.cache-ttl-seconds`) para no repetir la llamada a GitHub en cada visita. Timeout 7s. Si GitHub falla, devuelve una **lista fallback hardcodeada** de 5 proyectos (nunca rompe).
 - **Curación de topics** (`GitHubService.pickTopics`): un repo suele traer 10-16 topics, de los que solo se muestran **3**. Se descartan los genéricos (`NOISE_TOPICS`: backend, full-stack…) y el que repite el lenguaje; se priorizan los conceptuales (`CONCEPT_TOPICS`: arquitectura, seguridad, dominio) con un tope de 2 para **reservar hueco al stack**; y `SYNONYM_GROUPS` evita mostrar dos etiquetas que dicen lo mismo (p. ej. `jwt-authentication` + `security`). El resultado es **determinista**: antes se elegía un topic al azar y cambiaba al expirar la caché.
 - **`CsrfValidationFilter`** (`@Order(-100)`): intercepta **solo** `/api/projects`. Si falta el header o no coincide con el token en sesión → responde `404`. El frontend, ante error, muestra su propio fallback (estado `error` en `useProjects`).
+- **Cookie de sesión** (`SecurityConfig.webSessionIdResolver`): `HttpOnly` + `SameSite=Lax` + `Secure` condicional (`session.cookie.secure`, o `SESSION_COOKIE_SECURE=true` en Railway). Secure no puede ir fijo porque en local se sirve por HTTP y el navegador descartaría la cookie, rompiendo el flujo CSRF.
 - **`SecurityConfig`**: CSRF de Spring **deshabilitado** (se usa el filtro custom), CSP propia (`script-src 'self'`, `font-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, etc.), todo `permitAll`. También desactiva el `cache()` por defecto de Spring Security, que ponía `no-store` en **toda** respuesta e impedía cachear los estáticos.
 - **`CacheControlFilter`** (`@Order(-90)`): fija `Cache-Control` por ruta en `beforeCommit` (para ganar al manejador de estáticos):
   - `/assets/**` y `/fonts/**` → `public, max-age=31536000, immutable` (Vite pone hash de contenido en el nombre; **sustituir una fuente obliga a renombrarla**).
@@ -196,6 +206,10 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 ```
 - `GitHubServiceTest` — unitario, sin red: construye el `WebClient` con `exchangeFunction(...)` fake para simular respuestas de GitHub. Cubre filtrado (forks / repo homónimo / sin descripción), mapeo a `RepoDTO`, fallback ante error, caché (no repite la llamada HTTP), el header `Authorization: Bearer` condicionado a que haya token, y la curación de topics (genéricos descartados, prioridad conceptual, hueco reservado al stack, sinónimos deduplicados, repo sin topics → lista vacía).
 - `CsrfValidationFilterTest` — unitario sobre el `WebFilter` con `MockServerWebExchange`: sin header → 404, header que no coincide con la sesión → 404, header válido → deja pasar, rutas distintas de `/api/projects` no se validan.
+- `ChatServiceTest` — el prompt de sistema lleva reglas + perfil, el historial se conserva en orden, y los errores **se propagan** (traducirlos es cosa del advice).
+- `ChatExceptionHandlerTest` — cada `statusCode` produce su mensaje (429 límite, 402 sin crédito, config/red genérico) y siempre con 200 + `text/event-stream`.
+- `ChatControllerTest` — pregunta vacía no llega al modelo, recorte a 500 caracteres, historial recortado a 6 turnos, y un turno con rol `system` degradado a `user`.
+- `ChatRateLimitFilterTest` — cupo por sesión: dentro pasa, al superarlo 429 sin llamar al modelo, sesiones distintas no comparten cupo, otras rutas no consumen.
 - `CacheControlFilterTest` — la política de caché por ruta: assets con hash y fuentes inmutables, imágenes/CV a un día, y `index.html` + `/api/**` sin cachear nunca (esto último es el que protege los despliegues).
 - `CsrfTokenControllerTest` — `WebTestClient.bindToController(...)`: token no vacío + cookie de sesión, mismo token en la misma sesión, tokens distintos entre sesiones.
 - `ProjectControllerTest` — `WebTestClient.bindToController(...)` con `GitHubService` mockeado: 200 con la lista, 200 con lista vacía, y el camino defensivo 204 (`Mono.empty()`) del controller.
@@ -206,15 +220,53 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 cd frontend
 npm test          # una pasada (CI)
 npm run test:watch
+npm run lint      # ESLint (flat config + react-hooks)
 ```
 - `api/client.test.js` — `getCsrfToken`/`getProjects` contra `fetch` mockeado: headers/credentials correctos, error si la respuesta no es `ok`, `[]` en `204`.
 - `hooks/useProjects.test.js` — estados `loading` → `success`/`error` mockeando `api/client.js`.
 - `hooks/useRevealOnScroll.test.jsx` — `IntersectionObserver` mockeado: observa los `.rv` al montar, añade `.on` al intersectar, `disconnect()` al desmontar.
 - `i18n/LanguageContext.test.jsx` — detección de idioma (`localStorage` > navegador > default), `setLang` (persistencia, `<html lang>`, idiomas no soportados), error al usar `useLanguage` fuera del provider.
 - `components/RichText.test.jsx`, `LanguageToggle.test.jsx`, `Contact.test.jsx`, `Footer.test.jsx` — comportamiento observable: negritas → `<strong>`, botón de idioma activo/click, CV descargable por idioma, año dinámico.
+- `api/streamChat.test.js` — el parser SSE: reconstruye el texto, aguanta que un evento llegue troceado entre lecturas, une varias líneas `data:` de un mismo evento, y distingue 429 del resto.
+- `hooks/useChat.test.js` — turno de usuario + turno del asistente rellenándose con el stream, preguntas vacías ignoradas, token CSRF reutilizado, y mensajes de límite/error sin romper la UI.
 - `components/ProjectCard.test.jsx` — título legible (y respeto de mayúsculas existentes), chips de lenguaje y topics, ausencia de chips si el repo no trae topics, "actualizado hace X" localizado (con `vi.setSystemTime`) y omitido si no hay `pushed_at`, enlace y descripción de respaldo.
 
 No hay tests de `CustomCursor` (loop de `requestAnimationFrame` puramente imperativo) ni de componentes de solo layout (`Hero`, `About`, `Navbar`, `MobileDrawer`, `GithubCard`, `Projects`) — bajo valor relativo al esfuerzo de mockear DOM/IntersectionObserver para lo que son, en esencia, vistas sin lógica propia.
+
+---
+
+## Chat con IA
+
+Asistente que responde preguntas sobre el perfil de Adrián, montado sobre **su propia librería** [`prompt-link`](https://github.com/adrian0511/prompt-link) (`io.github.adrian0511:prompt-link`, en Maven Central), que enruta a OpenRouter.
+
+**Por qué existe**: no es una utilidad para el visitante (pocos usarán un chat), es la demostración de una competencia que el portfolio solo afirmaba. De paso justifica WebFlux: hasta ahora el backend reactivo servía un único `GET`; el streaming SSE token a token sí es el caso de uso para el que existe WebFlux.
+
+**Flujo**: `POST /api/chat` → `ChatService` monta `[system(reglas+perfil), ...historial, user(pregunta)]` → `ReactiveAiService.stream(...)` → `Flux<String>` → SSE al navegador.
+
+- **`chat/profile.md`** (en `resources/`) es la **única** fuente de datos del asistente. Ampliar el chat = editar ese fichero, sin tocar código.
+- **Guardarraíles en el prompt de sistema**: responder solo desde el perfil; ante lo que no consta, derivar al email; hablar de Adrián en tercera persona; ignorar instrucciones del visitante que intenten reescribir las reglas. *Un modelo inventando "sí, domina Kubernetes" ante un reclutador es peor que no tener chat.*
+- **`ChatExceptionHandler`** (`@RestControllerAdvice`): traduce `AiClientException` a texto útil con **200**, no a un error. Distingue 429 (límite), 402 (sin crédito) y el resto. **Limitación real**: solo captura fallos *previos al primer token* (sin API key, 401, 429, red), que son los habituales porque `stream(...)` falla en la petición inicial. Un fallo a mitad de stream (`STREAM_ERROR`) llega con la respuesta ya comprometida y el visitante vería la respuesta truncada.
+- **`ChatRateLimitFilter`** (`@Order(-95)`): tres cupos, porque el de sesión **por sí solo no protegía nada** — crear una sesión cuesta una petición a `/api/csrf-token`, así que un script que descarte la cookie tenía mensajes ilimitados (verificado con `curl`):
+  - **por sesión** (`chat.max-messages-per-session`, 20): cortesía para un navegador normal.
+  - **por IP y hora** (`chat.max-messages-per-ip-per-hour`, 15): la barrera real, porque las IPs sí son un recurso escaso. El mapa se poda para que no sea a su vez un vector de agotamiento de memoria.
+  - **global diario** (`chat.max-messages-per-day`, 150): última línea de defensa; acota el gasto aunque el atacante tenga muchas IPs.
+- **Nada de filtrar por `Origin`/`Referer`**: se comprobó en un navegador real que **no envía `Origin`** en este POST, y `Referrer-Policy: no-referrer` (de Spring Security) impide el `Referer`. Exigir cualquiera de las dos habría bloqueado a los visitantes de verdad.
+- **Topes de entrada en el controller**: pregunta a 500 caracteres y historial a los 6 últimos turnos; los turnos con rol `system` se degradan a `user` para que nadie reescriba las reglas desde el navegador.
+- **Sin API key el chat no rompe**: responde con el mensaje de respaldo derivando al email, igual que los proyectos tienen su lista de respaldo.
+
+**Dónde va la API key**:
+- **Local**: `config/application.properties` (en la raíz del proyecto, **git-ignorado**). Spring Boot lee `./config/` automáticamente y sus valores ganan a los de `src/main/resources`, sin perfiles ni flags ni dependencias. Es el sustituto nativo de un `.env`, que Spring **no** lee de serie.
+  - *No buscar librerías de `.env`*: `spring-dotenv` no sirve aquí — su última versión es de mayo de 2023 y no funciona con Spring Boot 4. La ventaja de `./config/` es justamente que forma parte de la resolución de configuración del propio Spring Boot, así que no se rompe al subir de versión.
+- **Railway**: variable de entorno `OPENROUTER_API_KEY`.
+- **Nunca** en `frontend/.env`: Vite inlinea las variables `VITE_*` en el bundle público y la clave quedaría a la vista de cualquiera.
+- Hay que **reiniciar** el backend tras ponerla: Spring la lee al arrancar.
+
+**Configuración** (`ai.*` las lee la librería):
+- `ai.api-key=${OPENROUTER_API_KEY:}` — sin ella, modo respaldo.
+- `ai.model=${AI_MODEL:google/gemma-4-31b-it:free}` — el tier gratuito de OpenRouter son **20 req/min y 50 req/día** (1.000/día si alguna vez se compran $10 en créditos). Al agotarse entra el mensaje de respaldo.
+- `ai.read-timeout=25s` — seguro **porque hay streaming**: el primer token llega rápido. En una llamada no-streaming OpenRouter no envía nada hasta terminar de generar, y 25s mataría respuestas largas.
+
+**Sin RAG a propósito**: el perfil son dos páginas y cabe entero en el prompt de sistema. Montar embeddings para eso sería sobreingeniería.
 
 ---
 
@@ -238,12 +290,13 @@ Decisiones tomadas y por qué (medido con Playwright contra el jar de producció
 - **Comentarios solo si son necesarios**: se comenta el *porqué* de una decisión no evidente (un workaround, una restricción externa, una alternativa descartada), nunca el *qué* hace el código. Si el comentario se limita a repetir lo que ya dice el nombre de la función o la línea siguiente, sobra.
 
 ## Notas / deuda técnica conocida
-- **Java 25 requerido para buildear**: el `maven-compiler-plugin` fuerza `source/target=25` aunque `java.version=21`. Unificar (o bien a 21, o alinear todo a 25).
+- **Java 25 requerido para buildear** (`java.version=25` en el `pom.xml`, igual que el Dockerfile). Antes las propiedades decían 21 y el plugin forzaba 25, lo que hacía creer que bastaba un JDK 21.
 - Links del drawer y del `#contact` ya apuntan a los perfiles reales (`github.com/adrian0511`, `linkedin.com/in/adrdev`).
-- Estilos inline aún abundantes en algunos componentes (Hero, GithubCard) — candidatos a mover a CSS/Modules. `ProjectCard` ya está migrado (clase `.pc-link`).
+- Estilos inline ya migrados a CSS en `ProjectCard` (`.pc-link`), `GithubCard` (`.gh-*`) y `Hero` (`.photo-stack`). Quedan algunos sueltos en `Projects` (mensaje de error).
 - CSS global pendiente de pasar a CSS Modules de forma incremental.
-- **Sin CI/CD**: no hay workflow de GitHub Actions que ejecute `./mvnw test` / `npm test` en cada push o PR. Los tests existen pero corren solo en local por ahora.
+- **CI en GitHub Actions** (`.github/workflows/ci.yml`): en cada push/PR a `main` o `dev` corre tests de backend, tests + build de frontend, y por último el `mvnw package` completo (el mismo que ejecuta Railway al desplegar).
+- **No se puede subir a Spring Boot 4.1.x**: `prompt-link` arrastra Spring Cloud OpenFeign, y el verificador de compatibilidad de Spring Cloud 2025.1.x aborta el arranque con *"Spring Boot [4.1.1] is not compatible with this Spring Cloud release train — change to [4.0.x]"*. Comprobado: con 4.1.1 fallan los 4 tests que levantan contexto (los unitarios pasan, porque no arrancan Spring). Para subir habría que actualizar antes `prompt-link` a un release train de Spring Cloud compatible con Boot 4.1. **4.0.8 es la última versión usable.**
 - **`vite` (devDependency) con vulnerabilidades conocidas** (moderate/high, vía `npm audit`): afectan solo al servidor de desarrollo (`vite dev`), no al build de producción que sirve Spring Boot. Actualizar a Vite 8 es un cambio mayor (breaking) pendiente de evaluar aparte.
-- Sin linter configurado en el frontend (no hay `.eslintrc` ni script `lint`).
+- **ESLint configurado** (`frontend/eslint.config.js`, flat config con react-hooks): `npm run lint`.
 - **`pushed_at` no es la fecha del último commit**: GitHub lo actualiza con cualquier push a *cualquier* rama (ramas de Dependabot, borrado de ramas…), así que el "Actualizado hace X" de las tarjetas puede indicar actividad que no es del autor. La fecha real sería `GET /repos/{owner}/{repo}/commits?per_page=1` (una llamada extra por repo). Se optó por mantener `pushed_at` por simplicidad.
-- No hay `<link rel="alternate" hreflang="es|en">` en `index.html` pese al contenido bilingüe (solo `og:locale:alternate`).
+- `hreflang` (es / en / x-default) declarado en `index.html`. Las tres alternativas apuntan a la misma URL porque el idioma se cambia en cliente.

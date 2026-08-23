@@ -30,7 +30,7 @@ export default function Hero() {
 
       {/* Foto derecha */}
       <div className="hero-photo-wrap">
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+        <div className="photo-stack">
           <div className="photo-corner tl"></div>
           <div className="photo-corner br"></div>
           <div className="photo-frame">
@@ -51,7 +51,7 @@ export default function Hero() {
             )}
 
             {imgError && (
-              <div className="photo-placeholder" id="placeholder" style={{ display: 'flex' }}>
+              <div className="photo-placeholder" id="placeholder">
                 <svg viewBox="0 0 64 64" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="32" cy="22" r="12" />
                   <path d="M8 56c0-13.255 10.745-24 24-24s24 10.745 24 24" />
