@@ -1,8 +1,12 @@
 package com.adrian.portfolio.security.filter;
 
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,9 +25,9 @@ import reactor.core.publisher.Mono;
 /**
  * Cupos del chat. El de sesión por sí solo no protege nada: crear una sesión
  * cuesta una petición a /api/csrf-token, así que un script que descarte la
- * cookie tiene mensajes ilimitados. Las barreras reales son la de IP (las
- * direcciones sí son un recurso escaso) y el tope diario global, que acota el
- * gasto pase lo que pase.
+ * cookie tiene mensajes ilimitados. Las barreras reales son la de IP (una
+ * dirección IPv4 o un /64 de IPv6 sí son un recurso escaso) y el tope diario
+ * global, que acota el gasto pase lo que pase.
  *
  * No se filtra por Origin ni Referer: el navegador no manda Origin en este POST
  * y la cabecera Referrer-Policy: no-referrer impide el Referer, así que exigir
@@ -38,6 +42,8 @@ public class ChatRateLimitFilter implements WebFilter {
     private static final String COUNT_ATTR = "CHAT_COUNT";
     private static final Duration IP_WINDOW = Duration.ofHours(1);
     private static final int MAX_TRACKED_IPS = 10_000;
+    // Los 8 primeros bytes de una IPv6: su /64.
+    private static final int IPV6_PREFIX_BYTES = 8;
 
     private final int maxPerSession;
     private final int maxPerIpPerHour;
@@ -93,7 +99,32 @@ public class ChatRateLimitFilter implements WebFilter {
         // getHostString() y no getAddress().getHostAddress(): detrás del proxy la
         // dirección viene SIN resolver (createUnresolved a partir del
         // X-Forwarded-For) y getAddress() devuelve null.
-        return address == null ? "desconocida" : address.getHostString();
+        return address == null ? "desconocida" : bucketOf(address.getHostString());
+    }
+
+    /**
+     * En IPv4 el cupo va por dirección; en IPv6, por /64.
+     *
+     * <p>Una dirección IPv6 suelta no es un recurso escaso: al visitante
+     * doméstico se le asigna un /64 entero, así que puede estrenar dirección en
+     * cada petición sin coste. Comprobado contra el jar: 20 peticiones rotando
+     * {@code 2001:db8:1:1::N} pasaban enteras con el cupo por hora en 15, y solo
+     * las frenaba el tope diario global. El /64 es el bloque más pequeño que se
+     * reparte de una pieza, así que es la unidad que de verdad cuesta conseguir.
+     */
+    private String bucketOf(String host) {
+        try {
+            // ofLiteral y no getByName: este valor viene de una cabecera, y
+            // getByName resolvería por DNS lo que no sea una IP.
+            if (InetAddress.ofLiteral(host) instanceof Inet6Address ipv6) {
+                byte[] prefix = Arrays.copyOf(ipv6.getAddress(), IPV6_PREFIX_BYTES);
+                return HexFormat.of().formatHex(prefix) + "::/64";
+            }
+        } catch (IllegalArgumentException noEsUnaIp) {
+            // Un valor que no es una IP literal se agrupa tal cual: no se pierde
+            // el cupo, solo deja de haber agrupación por prefijo.
+        }
+        return host;
     }
 
     private boolean dailyBudgetSpent() {
