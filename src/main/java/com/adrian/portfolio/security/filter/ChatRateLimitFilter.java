@@ -25,9 +25,9 @@ import reactor.core.publisher.Mono;
 /**
  * Cupos del chat. El de sesión por sí solo no protege nada: crear una sesión
  * cuesta una petición a /api/csrf-token, así que un script que descarte la
- * cookie tiene mensajes ilimitados. Las barreras reales son la de IP (una
- * dirección IPv4 o un /64 de IPv6 sí son un recurso escaso) y el tope diario
- * global, que acota el gasto pase lo que pase.
+ * cookie tiene mensajes ilimitados. Las barreras reales son las de IP (una
+ * dirección IPv4 o un /64 de IPv6 sí son un recurso escaso), por hora y por
+ * día, y el tope diario global, que acota el gasto pase lo que pase.
  *
  * No se filtra por Origin ni Referer: el navegador no manda Origin en este POST
  * y la cabecera Referrer-Policy: no-referrer impide el Referer, así que exigir
@@ -47,18 +47,21 @@ public class ChatRateLimitFilter implements WebFilter {
 
     private final int maxPerSession;
     private final int maxPerIpPerHour;
+    private final int maxPerIpPerDay;
     private final int maxPerDay;
 
-    private final Map<String, Window> perIp = new ConcurrentHashMap<>();
+    private final Map<String, Bucket> perIp = new ConcurrentHashMap<>();
     private final AtomicInteger usedToday = new AtomicInteger();
     private volatile LocalDate currentDay = LocalDate.now();
 
     public ChatRateLimitFilter(
             @Value("${chat.max-messages-per-session:20}") int maxPerSession,
             @Value("${chat.max-messages-per-ip-per-hour:15}") int maxPerIpPerHour,
+            @Value("${chat.max-messages-per-ip-per-day:20}") int maxPerIpPerDay,
             @Value("${chat.max-messages-per-day:150}") int maxPerDay) {
         this.maxPerSession = maxPerSession;
         this.maxPerIpPerHour = maxPerIpPerHour;
+        this.maxPerIpPerDay = maxPerIpPerDay;
         this.maxPerDay = maxPerDay;
     }
 
@@ -141,17 +144,27 @@ public class ChatRateLimitFilter implements WebFilter {
         return usedToday.get() >= maxPerDay;
     }
 
+    /**
+     * Dos cupos sobre la misma red: el de la hora frena las rachas, y el del día
+     * impide que una sola se lleve el presupuesto diario entero. Sin el segundo,
+     * 15 mensajes/hora bastaban para que una máquina vaciara en una tarde la
+     * cuota del día —hoy, 50 peticiones del tier gratuito de OpenRouter— y
+     * dejara el chat mudo para cualquier visitante.
+     */
     private boolean ipBudgetSpent(String ip) {
         // Un mapa sin tope sería su propio vector de abuso: muchas IPs falsas
-        // podrían hincharlo hasta agotar la memoria.
+        // podrían hincharlo hasta agotar la memoria. Podar tira de paso la cuenta
+        // del día de esa red, pero para llegar aquí harían falta más redes
+        // distintas de las que el tope diario global deja pasar.
         if (perIp.size() > MAX_TRACKED_IPS) {
-            perIp.entrySet().removeIf(entry -> entry.getValue().expired());
+            perIp.entrySet().removeIf(entry -> entry.getValue().idle());
         }
 
-        Window window = perIp.compute(ip,
-                (key, current) -> current == null || current.expired() ? new Window() : current);
+        Bucket bucket = perIp.computeIfAbsent(ip, key -> new Bucket());
 
-        return window.hits.incrementAndGet() > maxPerIpPerHour;
+        // En este orden: si ya se pasó de la hora, la petición no gasta cupo del
+        // día. Se rechaza igual, así que contarla dos veces sería cobrarla dos veces.
+        return bucket.hitsThisHour() > maxPerIpPerHour || bucket.hitsToday() > maxPerIpPerDay;
     }
 
     private Mono<Void> reject(ServerWebExchange exchange) {
@@ -159,12 +172,29 @@ public class ChatRateLimitFilter implements WebFilter {
         return exchange.getResponse().setComplete();
     }
 
-    private static final class Window {
-        private final Instant start = Instant.now();
-        private final AtomicInteger hits = new AtomicInteger();
+    /** Lo que una red lleva gastado: en la hora en curso y en el día. */
+    private static final class Bucket {
+        private final AtomicInteger today = new AtomicInteger();
+        private final AtomicInteger thisHour = new AtomicInteger();
+        private Instant hourStart = Instant.now();
 
-        boolean expired() {
-            return Instant.now().isAfter(start.plus(IP_WINDOW));
+        // La ventana de la hora se reinicia sola; la del día la limpia el cambio
+        // de fecha, que vacía el mapa entero.
+        synchronized int hitsThisHour() {
+            Instant now = Instant.now();
+            if (now.isAfter(hourStart.plus(IP_WINDOW))) {
+                hourStart = now;
+                thisHour.set(0);
+            }
+            return thisHour.incrementAndGet();
+        }
+
+        int hitsToday() {
+            return today.incrementAndGet();
+        }
+
+        synchronized boolean idle() {
+            return Instant.now().isAfter(hourStart.plus(IP_WINDOW));
         }
     }
 }
