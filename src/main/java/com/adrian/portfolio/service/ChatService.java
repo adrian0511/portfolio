@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -14,9 +15,11 @@ import com.adrian.portfolio.dto.RepoDTO;
 import io.github.adrian0511.prompt_link.dto.Message;
 import io.github.adrian0511.prompt_link.service.ReactiveAiService;
 
+import lombok.extern.log4j.Log4j2;
 import reactor.core.publisher.Flux;
 
 @Service
+@Log4j2
 public class ChatService {
 
     private final ReactiveAiService aiService;
@@ -88,10 +91,16 @@ public class ChatService {
             %s
             """;
 
-    public ChatService(ReactiveAiService aiService, GitHubService gitHubService) {
+    public ChatService(ReactiveAiService aiService, GitHubService gitHubService,
+            @Value("${ai.model:}") String model) {
         this.aiService = aiService;
         this.gitHubService = gitHubService;
         this.profile = loadProfile();
+
+        // Con qué modelo ha arrancado esto no se ve por ningún otro sitio: lo fija
+        // AI_MODEL si está en el entorno y, si no, el valor del properties. Saber
+        // cuál de los dos manda es la mitad de diagnosticar un fallo del chat.
+        log.info("Chat con el modelo '{}'", model);
     }
 
     private String loadProfile() {

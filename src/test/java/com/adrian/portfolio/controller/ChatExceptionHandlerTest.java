@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ChatExceptionHandlerTest {
 
-    private final ChatExceptionHandler handler = new ChatExceptionHandler();
+    private final ChatExceptionHandler handler = new ChatExceptionHandler("google/gemma-4-31b-it:free");
 
     private String bodyFor(int statusCode) {
         ResponseEntity<Flux<String>> response =

@@ -26,7 +26,7 @@ class ChatServiceTest {
 
     private final ReactiveAiService aiService = mock(ReactiveAiService.class);
     private final GitHubService gitHubService = mock(GitHubService.class);
-    private final ChatService chatService = new ChatService(aiService, gitHubService);
+    private final ChatService chatService = new ChatService(aiService, gitHubService, "google/gemma-4-31b-it:free");
 
     private static final List<RepoDTO> REPOS = List.of(
             new RepoDTO("orderflow", "Plataforma de pedidos con microservicios",
