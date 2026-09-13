@@ -6,6 +6,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
+import org.springframework.security.web.server.csrf.ServerCsrfTokenRepository;
+import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttributeHandler;
 import org.springframework.web.server.session.WebSessionIdResolver;
 import org.springframework.web.server.session.CookieWebSessionIdResolver;
 
@@ -46,12 +49,42 @@ public class SecurityConfig {
         return resolver;
     }
 
+    /**
+     * Token en cookie y no en sesión (el repositorio por defecto) porque quien lo
+     * tiene que leer es el JavaScript del navegador: de ahí withHttpOnlyFalse().
+     * Secure va condicionado por la misma razón que la cookie de sesión.
+     */
     @Bean
-    SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
-        // El CSRF de Spring va deshabilitado porque el flujo propio lo valida en
-        // CsrfValidationFilter contra el token guardado en la sesión.
+    ServerCsrfTokenRepository csrfTokenRepository(
+            @Value("${session.cookie.secure:false}") boolean secure) {
+        CookieServerCsrfTokenRepository repository = CookieServerCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(cookie -> cookie
+                .sameSite("Lax")
+                .secure(secure)
+                .path("/"));
+        return repository;
+    }
+
+    /**
+     * El CSRF nativo cubre POST /api/chat, que es lo que le corresponde: una
+     * petición con efecto (gasta cuota del modelo) y con el método que el
+     * mecanismo estándar protege. El filtro propio se queda solo con
+     * GET /api/projects, que el nativo no puede proteger por diseño.
+     *
+     * @see com.adrian.portfolio.security.filter.CsrfValidationFilter
+     */
+    @Bean
+    SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http,
+            ServerCsrfTokenRepository csrfTokenRepository) {
         return http
-                .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository)
+                        // El handler por defecto (XOR, protección BREACH) enmascara el
+                        // token por petición y espera recibirlo enmascarado; el cliente
+                        // devuelve el valor tal cual lo lee de la cookie, así que hay que
+                        // usar el plano. BREACH no aplica aquí: el token no se incrusta
+                        // en el HTML comprimido, viaja en una cabecera Set-Cookie.
+                        .csrfTokenRequestHandler(new ServerCsrfTokenRequestAttributeHandler()))
                 .headers(headers -> headers
                         // Su política por defecto (no-store en todo) impedía cachear
                         // los estáticos; CacheControlFilter la sustituye por ruta.

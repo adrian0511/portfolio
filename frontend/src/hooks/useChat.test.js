@@ -8,7 +8,7 @@ const t = { chat: { error: 'ERROR_MSG', limit: 'LIMIT_MSG' } }
 describe('useChat', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    vi.spyOn(client, 'getCsrfToken').mockResolvedValue('token-123')
+    vi.spyOn(client, 'ensureCsrfCookie').mockResolvedValue('token-123')
   })
 
   it('añade el turno del usuario y va rellenando el del asistente', async () => {
@@ -43,7 +43,7 @@ describe('useChat', () => {
     await act(() => result.current.send('una'))
     await act(() => result.current.send('otra'))
 
-    expect(client.getCsrfToken).toHaveBeenCalledTimes(1)
+    expect(client.ensureCsrfCookie).toHaveBeenCalledTimes(1)
   })
 
   it('muestra el mensaje de límite cuando el backend responde 429', async () => {

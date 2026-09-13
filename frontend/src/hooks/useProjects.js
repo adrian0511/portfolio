@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getCsrfToken, getProjects } from '../api/client.js'
+import { ensureCsrfCookie, getProjects } from '../api/client.js'
 
 // El backend ya devuelve una lista de respaldo si GitHub falla, así que el
 // estado 'error' solo se alcanza si la propia API no responde.
@@ -12,7 +12,7 @@ export default function useProjects() {
 
     ;(async () => {
       try {
-        const token = await getCsrfToken()
+        const token = await ensureCsrfCookie()
         const data = await getProjects(token)
         if (cancelled) return
         setRepos(data)

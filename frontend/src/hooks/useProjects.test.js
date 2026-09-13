@@ -9,7 +9,7 @@ describe('useProjects', () => {
   })
 
   it('empieza en loading y pasa a success con los repos del backend', async () => {
-    vi.spyOn(client, 'getCsrfToken').mockResolvedValue('token-123')
+    vi.spyOn(client, 'ensureCsrfCookie').mockResolvedValue('token-123')
     vi.spyOn(client, 'getProjects').mockResolvedValue([{ name: 'demo' }])
 
     const { result } = renderHook(() => useProjects())
@@ -21,8 +21,8 @@ describe('useProjects', () => {
     expect(client.getProjects).toHaveBeenCalledWith('token-123')
   })
 
-  it('pasa a error si el flujo csrf-token/projects falla', async () => {
-    vi.spyOn(client, 'getCsrfToken').mockRejectedValue(new Error('csrf-token: HTTP 500'))
+  it('pasa a error si el flujo csrf/projects falla', async () => {
+    vi.spyOn(client, 'ensureCsrfCookie').mockRejectedValue(new Error('csrf: sin cookie'))
     vi.spyOn(client, 'getProjects')
     vi.spyOn(console, 'error').mockImplementation(() => {})
 

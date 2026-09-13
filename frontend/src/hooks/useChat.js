@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { getCsrfToken, streamChat } from '../api/client.js'
+import { ensureCsrfCookie, streamChat } from '../api/client.js'
 
 const MAX_HISTORY = 6
 
@@ -28,7 +28,7 @@ export default function useChat(t) {
         })
 
       try {
-        if (!tokenRef.current) tokenRef.current = await getCsrfToken()
+        if (!tokenRef.current) tokenRef.current = await ensureCsrfCookie()
 
         await streamChat({
           csrfToken: tokenRef.current,

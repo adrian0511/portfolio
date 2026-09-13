@@ -1,37 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getCsrfToken, getProjects } from './client.js'
-
-describe('getCsrfToken', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('pide /api/csrf-token con credentials include y devuelve el token', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ token: 'abc-123' }),
-    })
-
-    const token = await getCsrfToken()
-
-    expect(token).toBe('abc-123')
-    expect(fetch).toHaveBeenCalledWith('/api/csrf-token', { credentials: 'include' })
-  })
-
-  it('lanza un error si la respuesta no es ok', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 })
-
-    await expect(getCsrfToken()).rejects.toThrow('csrf-token: HTTP 500')
-  })
-})
+import { ensureCsrfCookie, getProjects } from './client.js'
 
 describe('getProjects', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('envia el token como header X-CSRF-Token y devuelve la lista', async () => {
+  it('envia el token como header X-XSRF-TOKEN y devuelve la lista', async () => {
     const repos = [{ name: 'demo', html_url: 'https://github.com/adrian0511/demo' }]
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -44,7 +19,7 @@ describe('getProjects', () => {
     expect(result).toEqual(repos)
     expect(fetch).toHaveBeenCalledWith('/api/projects', {
       credentials: 'include',
-      headers: { 'X-CSRF-Token': 'mi-token' },
+      headers: { 'X-XSRF-TOKEN': 'mi-token' },
     })
   })
 
@@ -60,5 +35,38 @@ describe('getProjects', () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 })
 
     await expect(getProjects('token-invalido')).rejects.toThrow('projects: HTTP 404')
+  })
+})
+
+describe('ensureCsrfCookie', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    document.cookie = 'XSRF-TOKEN=; max-age=0'
+  })
+
+  it('devuelve el token de la cookie sin pedir nada al backend', async () => {
+    document.cookie = 'XSRF-TOKEN=cookie-123'
+    global.fetch = vi.fn()
+
+    await expect(ensureCsrfCookie()).resolves.toBe('cookie-123')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('provoca una respuesta del backend cuando la cookie aun no esta', async () => {
+    // En dev el index.html lo sirve Vite, asi que puede no haber pasado por el
+    // backend ninguna respuesta que emita la cookie.
+    global.fetch = vi.fn().mockImplementation(() => {
+      document.cookie = 'XSRF-TOKEN=recien-puesta'
+      return Promise.resolve({ ok: true, status: 200 })
+    })
+
+    await expect(ensureCsrfCookie()).resolves.toBe('recien-puesta')
+    expect(fetch).toHaveBeenCalledWith('/api/csrf-token', { credentials: 'include' })
+  })
+
+  it('lanza error si tras llamar al backend sigue sin haber cookie', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+
+    await expect(ensureCsrfCookie()).rejects.toThrow('csrf: sin cookie')
   })
 })

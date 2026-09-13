@@ -50,7 +50,7 @@ describe('streamChat', () => {
     expect(chunks.join('')).toBe('linea uno\nlinea dos')
   })
 
-  it('envia el token CSRF y la pregunta al backend', async () => {
+  it('envia el token del CSRF nativo y la pregunta al backend', async () => {
     mockResponse(bodyOf('data:ok\n\n'))
 
     await streamChat({ csrfToken: 'abc', question: '¿Java?', history: [], onChunk: () => {} })
@@ -59,7 +59,7 @@ describe('streamChat', () => {
     expect(url).toBe('/api/chat')
     expect(options.method).toBe('POST')
     expect(options.credentials).toBe('include')
-    expect(options.headers['X-CSRF-Token']).toBe('abc')
+    expect(options.headers['X-XSRF-TOKEN']).toBe('abc')
     expect(JSON.parse(options.body).question).toBe('¿Java?')
   })
 
