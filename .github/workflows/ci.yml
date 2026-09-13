@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main, dev]
 
+# Estos jobs solo leen el repositorio: nada de publicar releases, comentar PRs ni
+# mover ramas. Sin este bloque, el GITHUB_TOKEN hereda el permiso por defecto del
+# repo, que puede ser de escritura, y una dependencia comprometida en el build lo
+# tendria a mano.
+permissions:
+  contents: read
+
 # Una serie por rama: si llegan dos pushes seguidos, se cancela el anterior en
 # vez de gastar minutos en un commit que ya está superado.
 concurrency:

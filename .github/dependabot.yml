@@ -1,0 +1,30 @@
+# Sin esto, las vulnerabilidades de dependencias solo aparecen si a alguien se le
+# ocurre lanzar `npm audit` o mirar el arbol de Maven a mano.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # prompt-link arrastra Spring Cloud OpenFeign, y su verificador de
+      # compatibilidad aborta el arranque con Boot 4.1.x ("change to [4.0.x]").
+      # Los parches de la 4.0.x -que son los que traen los arreglos de
+      # seguridad- si interesan; subir de linea no, hasta que prompt-link vaya
+      # con un release train compatible.
+      - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # Las actions estan fijadas por tag mayor (v5), asi que esto solo se mueve
+  # cuando salga una v6; aun asi conviene enterarse.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly

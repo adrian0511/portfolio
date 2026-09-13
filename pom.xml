@@ -63,6 +63,17 @@
 			<groupId>io.github.adrian0511</groupId>
 			<artifactId>prompt-link</artifactId>
 			<version>1.1.0</version>
+			<exclusions>
+				<!-- Llega por Spring Cloud OpenFeign -> feign-form-spring, y solo
+				     sirve para subir ficheros multipart por Feign: aqui las
+				     peticiones a OpenRouter son JSON. La rama 1.x esta sin
+				     mantenimiento y arrastra CVE-2025-48976, asi que viajaba en el
+				     jar solo para que cualquier escaner de la imagen la marcara. -->
+				<exclusion>
+					<groupId>commons-fileupload</groupId>
+					<artifactId>commons-fileupload</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 	</dependencies>
 
