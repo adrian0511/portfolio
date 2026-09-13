@@ -100,7 +100,7 @@
         <plugin>
             <groupId>com.github.eirslett</groupId>
             <artifactId>frontend-maven-plugin</artifactId>
-            <version>1.15.1</version>
+            <version>2.0.2</version>
             <!-- 'npm ci' borra y recrea node_modules, así que revienta si el
                  servidor de Vite está corriendo (mantiene abierto esbuild.exe).
                  Con -Dskip.frontend=true se saltan los tres pasos de golpe:
