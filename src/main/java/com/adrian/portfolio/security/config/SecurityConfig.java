@@ -32,10 +32,8 @@ public class SecurityConfig {
             "object-src 'none'");
 
     /**
-     * La cookie de sesión salía solo con HttpOnly. SameSite=Lax impide que otro
-     * sitio la use en peticiones cross-site, y Secure evita que viaje en claro;
-     * este último se activa por variable de entorno porque en local se sirve por
-     * HTTP y el navegador descartaría una cookie marcada como Secure.
+     * {@code Secure} va por variable de entorno y no fijo: en local se sirve por
+     * HTTP y el navegador descartaría la cookie.
      */
     @Bean
     WebSessionIdResolver webSessionIdResolver(
@@ -49,11 +47,7 @@ public class SecurityConfig {
         return resolver;
     }
 
-    /**
-     * Token en cookie y no en sesión (el repositorio por defecto) porque quien lo
-     * tiene que leer es el JavaScript del navegador: de ahí withHttpOnlyFalse().
-     * Secure va condicionado por la misma razón que la cookie de sesión.
-     */
+    /** En cookie y no en sesión: quien lee el token es el JavaScript del navegador. */
     @Bean
     ServerCsrfTokenRepository csrfTokenRepository(
             @Value("${session.cookie.secure:false}") boolean secure) {
@@ -66,10 +60,9 @@ public class SecurityConfig {
     }
 
     /**
-     * El CSRF nativo cubre POST /api/chat, que es lo que le corresponde: una
-     * petición con efecto (gasta cuota del modelo) y con el método que el
-     * mecanismo estándar protege. El filtro propio se queda solo con
-     * GET /api/projects, que el nativo no puede proteger por diseño.
+     * El CSRF nativo cubre {@code POST /api/chat}: un método que protege por diseño
+     * y una petición con efecto real (gasta cuota del modelo). El GET de
+     * {@code /api/projects}, que no puede cubrir, lo vigila un filtro propio.
      *
      * @see com.adrian.portfolio.security.filter.CsrfValidationFilter
      */
@@ -79,11 +72,10 @@ public class SecurityConfig {
         return http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
-                        // El handler por defecto (XOR, protección BREACH) enmascara el
-                        // token por petición y espera recibirlo enmascarado; el cliente
-                        // devuelve el valor tal cual lo lee de la cookie, así que hay que
-                        // usar el plano. BREACH no aplica aquí: el token no se incrusta
-                        // en el HTML comprimido, viaja en una cabecera Set-Cookie.
+                        // El handler por defecto (XOR) enmascara el token por petición y
+                        // lo espera enmascarado de vuelta, y el cliente devuelve lo que lee
+                        // de la cookie. Su motivo, BREACH, no aplica: el token no se
+                        // incrusta en el HTML comprimido, viaja en un Set-Cookie.
                         .csrfTokenRequestHandler(new ServerCsrfTokenRequestAttributeHandler()))
                 .headers(headers -> headers
                         // Su política por defecto (no-store en todo) impedía cachear

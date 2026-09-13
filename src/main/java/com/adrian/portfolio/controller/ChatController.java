@@ -21,17 +21,11 @@ import reactor.core.publisher.Flux;
 @RequiredArgsConstructor
 public class ChatController {
 
-    // Topes de entrada: sin ellos, cualquiera puede inflar el coste por petición
-    // mandando una pregunta enorme o un historial fabricado.
-    //
-    // El tope de la pregunta por sí solo no servía: el historial venía sin límite
-    // por turno, así que el único techo real era el del cuerpo HTTP
-    // (spring.codec.max-in-memory-size, 256 KB por defecto). Comprobado con curl:
-    // un historial de 200 KB llegaba entero al prompt, ~500 veces lo que este tope
-    // aparentaba permitir. Cada turno se recorta a lo que de verdad puede medir.
+    // Sin un tope POR TURNO estos otros dos no valen nada: el techo real pasa a ser
+    // el del cuerpo HTTP (spring.codec.max-in-memory-size, 256 KB) y un historial
+    // de 200 KB llega entero al prompt.
     private static final int MAX_QUESTION_LENGTH = 500;
-    // Un turno del asistente lo generó el modelo con ai.max-tokens=600, así que no
-    // da para mucho más; de sobra para no cortar una respuesta legítima.
+    // Lo generó el modelo con ai.max-tokens=600, así que no da para más.
     private static final int MAX_ANSWER_LENGTH = 2000;
     private static final int MAX_HISTORY_TURNS = 6;
 

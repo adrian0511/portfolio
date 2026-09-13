@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 
-// Revela los elementos .rv al entrar en viewport.
-// `deps` fuerza un re-escaneo: los elementos que aparecen después del montaje
-// (p.ej. las tarjetas de proyectos al llegar la respuesta) no se observarían.
+// `deps` fuerza un re-escaneo: sin eso, los elementos que aparecen después del
+// montaje (las tarjetas de proyectos al llegar la respuesta) no se observarían.
 export default function useRevealOnScroll(deps = []) {
   useEffect(() => {
     const io = new IntersectionObserver(

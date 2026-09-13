@@ -1,6 +1,4 @@
-// Diccionarios de traducción (es / en).
-// Convención: el texto puede llevar **negritas**, que <RichText> convierte en
-// <strong> construyendo nodos React (no usa innerHTML, así que es seguro).
+// El texto puede llevar **negritas**: las convierte <RichText>, no innerHTML.
 // Los nombres de tecnologías del stack no se traducen.
 
 export const translations = {

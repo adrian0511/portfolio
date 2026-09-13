@@ -40,11 +40,9 @@ public class ChatExceptionHandler {
     }
 
     /**
-     * El modelo va en la línea porque sin él un 400 no se puede diagnosticar: ese
-     * código significa que OpenRouter rechaza el id, y lo que hay que ver es qué
-     * id le ha llegado. Pasó en producción con {@code AI_MODEL} mal puesta en
-     * Railway, y el log solo decía "statusCode=400". Entre comillas a propósito:
-     * así se ven los espacios y las comillas que a veces viajan pegadas al valor.
+     * El modelo va en la línea porque un 400 es OpenRouter rechazando el id, y sin
+     * verlo no hay nada que diagnosticar. Entre comillas: así se ven los espacios
+     * que viajan pegados al valor, que es lo que tuvo el chat caído en producción.
      */
     private void log(AiClientException error) {
         if (error.getStatusCode() == AiClientException.CONFIGURATION_ERROR) {

@@ -10,20 +10,16 @@ import reactor.core.publisher.Mono;
 
 /**
  * El {@code Mono<CsrfToken>} que Spring Security deja en el exchange es perezoso:
- * la cookie XSRF-TOKEN no se escribe hasta que alguien se suscribe, y aquí no hay
- * plantilla de servidor que lo haga. Sin este filtro el navegador nunca recibiría
- * el token y el POST del chat sería un 403 seguro.
+ * sin alguien que se suscriba, la cookie {@code XSRF-TOKEN} no se escribe nunca y
+ * el POST del chat sería un 403 seguro. Aquí no hay plantilla de servidor que lo
+ * haga, así que lo hace este filtro.
  *
- * <p>Solo se fuerza en {@code /api/**} por dos motivos: son las únicas respuestas
- * que salen con {@code no-store} (ver CacheControlFilter), así que emitir la
- * cookie junto a un asset {@code immutable} dejaría que una caché compartida
- * sirviera el mismo token a todos los visitantes; y el frontend ya llama a
- * {@code /api/csrf-token} al cargar la página, así que la cookie está puesta
- * mucho antes de que nadie abra el chat.
+ * <p>Solo en {@code /api/**}: son las únicas respuestas {@code no-store}, y emitir
+ * la cookie junto a un asset {@code immutable} dejaría que una caché compartida
+ * sirviera el mismo token a todos los visitantes.
  *
- * <p>No lleva {@code @Order}: tiene que ejecutarse por detrás del
- * WebFilterChainProxy de Spring Security (orden -100), que es quien deja el
- * atributo en el exchange.
+ * <p>Sin {@code @Order} —el último— porque tiene que correr por detrás del
+ * {@code WebFilterChainProxy} (orden -100), que es quien pone el atributo.
  */
 @Component
 public class CsrfCookieFilter implements WebFilter {

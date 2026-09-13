@@ -12,39 +12,25 @@ import org.springframework.web.server.adapter.ForwardedHeaderTransformer;
 import lombok.extern.log4j.Log4j2;
 
 /**
- * Resuelve la IP del visitante a partir del <b>último</b> valor de
- * {@code X-Forwarded-For}, no del primero.
+ * Resuelve la IP del visitante desde el <b>último</b> valor de
+ * {@code X-Forwarded-For}, no desde el primero.
  *
- * <p><b>El problema.</b> Spring coge el valor más a la izquierda
- * ({@code ForwardedHeaderUtils.parseForwardedFor} → {@code getLeftMostValue}),
- * y un proxy <b>añade</b> la IP real por la derecha. Así que el valor izquierdo
- * es siempre el que escribió el propio cliente: bastaba mandar
- * {@code X-Forwarded-For: 9.9.9.9} —o la cabecera estándar {@code Forwarded}—
- * para estrenar un cupo limpio en cada petición y dejar inútil el límite por IP
- * de {@code ChatRateLimitFilter}. Verificado con curl: con la IP real añadida
- * detrás, {@code "7.7.7.7, 127.0.0.1"}, seguía ganando la falsa.
+ * <p>Spring usa el valor más a la izquierda, que es siempre el que escribió el
+ * cliente: un proxy añade la IP real por la derecha. Mandando
+ * {@code X-Forwarded-For: 9.9.9.9} —o la cabecera {@code Forwarded}, que por eso
+ * se ignora— se estrenaba cupo en cada petición y el límite por IP de
+ * {@code ChatRateLimitFilter} no protegía nada.
  *
- * <p>Esto no se puede arreglar en un {@code WebFilter}: el transformer borra las
- * cabeceras {@code X-Forwarded-*} del request antes de que corra ninguno, así
- * que para entonces solo queda el {@code remoteAddress} ya falseado.
+ * <p>No sirve hacerlo en un {@code WebFilter}: el transformer borra las
+ * cabeceras {@code X-Forwarded-*} antes de que corra ninguno.
  *
- * <p><b>El arreglo.</b> El último valor lo pone el proxy que tenemos delante
- * (Railway) a partir de la conexión real, y el cliente no puede escribir a su
- * derecha. Además se ignora la cabecera estándar {@code Forwarded}, que ningún
- * proxy nuestro emite y solo aportaba una segunda vía de suplantación.
- *
- * <p><b>Asume exactamente un proxy delante.</b> Si algún día se mete otra capa
- * (una CDN por encima de Railway), el último valor pasaría a ser la IP de esa
- * capa y todos los visitantes compartirían cupo. Molesto, pero falla <i>cerrado</i>:
- * de más restrictivo, nunca de más permisivo, que es como debe fallar un límite
- * de uso. Lo que no se puede es volver a confiar en el valor de la izquierda.
- *
- * <p>Para que esa suposición no se rompa en silencio, la primera vez que el
- * valor resuelto no parece una dirección pública se deja un aviso en el log:
- * ver {@link #esDeVisitante(String)}.
+ * <p><b>Asume exactamente un proxy delante.</b> Con otra capa (una CDN sobre
+ * Railway) el último valor sería el de esa capa y todos los visitantes
+ * compartirían cupo: falla cerrado, y {@link #esDeVisitante(String)} lo avisa en
+ * el log. Lo que no se puede es volver a confiar en el valor de la izquierda.
  *
  * <p>El nombre del bean es obligatorio: {@code WebHttpHandlerBuilder} busca el
- * transformer por el nombre {@code forwardedHeaderTransformer}, no por tipo.
+ * transformer por nombre, no por tipo.
  */
 @Component("forwardedHeaderTransformer")
 @Log4j2
@@ -93,14 +79,10 @@ public class TrustedClientIpTransformer extends ForwardedHeaderTransformer {
     }
 
     /**
-     * Si el último valor no es una dirección pública, es que delante hay más de
-     * un salto y lo que estamos tomando por el visitante es un proxy interno:
-     * todos compartirían cupo en {@code ChatRateLimitFilter}. Falla cerrado, así
-     * que no rompe nada, pero dejaría el chat en 15 mensajes/hora para todo el
-     * mundo sin que nadie se entere. De ahí el aviso.
-     *
-     * <p>Una sola vez por arranque: es una condición de configuración, no un
-     * evento por petición, y repetirlo llenaría el log del incidente.
+     * Una dirección privada como último valor significa que delante hay más de un
+     * salto: el chat quedaría en un solo cupo para todos, en silencio. Se avisa
+     * una vez por arranque, que es una condición de configuración y no un evento
+     * por petición.
      */
     private void avisarSiNoPareceVisitante(String client, String header) {
         if (esDeVisitante(client) || !avisado.compareAndSet(false, true)) {

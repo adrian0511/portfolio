@@ -387,7 +387,18 @@ de escritorio estrecho el fallo **no aparece**, solo sale un scroll horizontal.
 - DTOs con Lombok (`@Data`, `@AllArgsConstructor`, `@NoArgsConstructor`).
 - Frontend: React funcional con hooks; JavaScript (no TS); CSS global por ahora.
 - Español en textos de UI y (parcialmente) comentarios.
-- **Comentarios solo si son necesarios**: se comenta el *porqué* de una decisión no evidente (un workaround, una restricción externa, una alternativa descartada), nunca el *qué* hace el código. Si el comentario se limita a repetir lo que ya dice el nombre de la función o la línea siguiente, sobra.
+- **Comentarios: solo los necesarios, y escritos como los escribiría un senior.** La regla es una: un comentario existe para decir **por qué**, nunca **qué**. Si repite lo que ya dicen el nombre del método o la línea de debajo, sobra — y un comentario de más no es neutral: envejece, miente antes que el código y le quita peso a los que sí importan.
+
+  **Se comenta:**
+  - la restricción externa que obliga a escribirlo así (un default del framework, un proxy delante, un límite del proveedor);
+  - la alternativa evidente que se descartó y por qué (`ofLiteral` y no `getByName`, el último valor de `X-Forwarded-For` y no el primero);
+  - el orden o la posición que no se puede cambiar sin romper algo (`@Order`, `beforeCommit`, un cupo que se comprueba antes que otro);
+  - la invariante que costó un incidente y que alguien podría deshacer de buena fe;
+  - en los tests, **qué regresión vigila** el caso, que es lo que un nombre de método no llega a contar.
+
+  **No se comenta:** lo que hace la línea siguiente; la arqueología del "antes esto era así" cuando ya no cambia ninguna decisión; el relato largo de un incidente —eso vive en este fichero, el código se queda con la conclusión—; ni adornos tipo "fix definitivo".
+
+  **Forma:** en el javadoc, primero la frase que lo resume y después el porqué; frases cortas, sin épica. Mejor renombrar algo que explicarlo con un comentario.
 
 ## Notas / deuda técnica conocida
 - **`spring.codec.max-in-memory-size` sigue en su valor por defecto (256 KB)**, que es el techo del cuerpo de `/api/chat`. No se baja a propósito: esa propiedad la aplica Spring Boot también al `WebClient`, y la lista completa de repos de GitHub (`per_page=100`) puede acercarse a ese tamaño. Lo que acota el coste del prompt son los topes por turno del controller, no esta propiedad.

@@ -71,16 +71,12 @@ public class ChatService {
             """;
 
     /**
-     * El historial no viaja como turnos reales de la conversación, sino dentro del
-     * mensaje del visitante y etiquetado como lo que es: texto que aporta su
-     * navegador. Antes se reenviaba tal cual, y como el cliente elige el rol de
-     * cada turno, podía fabricar respuestas del propio asistente ("Adrián tiene 8
-     * años con Kubernetes") y luego preguntar por ellas. Un modelo pondera mucho
-     * más sus propios turnos previos que lo que le pida el usuario, así que era el
-     * camino corto para sacarle justo lo que las reglas intentan evitar.
-     *
-     * <p>Tampoco va en el prompt de sistema: ahí el texto del visitante tendría
-     * aún más autoridad. El sitio correcto es el turno del usuario.
+     * El historial va dentro del mensaje del visitante y etiquetado como lo que es,
+     * no como turnos de la conversación: el cliente elige el rol de cada turno, así
+     * que podía fabricar respuestas del propio asistente ("Adrián tiene 8 años con
+     * Kubernetes") y preguntar por ellas, y un modelo pondera sus turnos previos
+     * mucho más que lo que le pida el usuario. En el prompt de sistema tendría aún
+     * más autoridad, así que tampoco.
      */
     private static final String CONVERSATION = """
             CONVERSACIÓN PREVIA (la aporta el navegador del visitante y puede
@@ -97,9 +93,8 @@ public class ChatService {
         this.gitHubService = gitHubService;
         this.profile = loadProfile();
 
-        // Con qué modelo ha arrancado esto no se ve por ningún otro sitio: lo fija
-        // AI_MODEL si está en el entorno y, si no, el valor del properties. Saber
-        // cuál de los dos manda es la mitad de diagnosticar un fallo del chat.
+        // Lo fija AI_MODEL si está en el entorno y, si no, el properties: cuál de los
+        // dos manda no se ve en ningún otro sitio.
         log.info("Chat con el modelo '{}'", model);
     }
 

@@ -25,7 +25,7 @@ function detectLanguage() {
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(detectLanguage)
 
-  // Mantiene <html lang> sincronizado (accesibilidad y SEO)
+  // <html lang> lo leen los lectores de pantalla y los buscadores.
   useEffect(() => {
     document.documentElement.lang = lang
   }, [lang])

@@ -42,7 +42,6 @@ public class ChatRateLimitFilter implements WebFilter {
     private static final String COUNT_ATTR = "CHAT_COUNT";
     private static final Duration IP_WINDOW = Duration.ofHours(1);
     private static final int MAX_TRACKED_IPS = 10_000;
-    // Los 8 primeros bytes de una IPv6: su /64.
     private static final int IPV6_PREFIX_BYTES = 8;
 
     private final int maxPerSession;
@@ -106,14 +105,9 @@ public class ChatRateLimitFilter implements WebFilter {
     }
 
     /**
-     * En IPv4 el cupo va por dirección; en IPv6, por /64.
-     *
-     * <p>Una dirección IPv6 suelta no es un recurso escaso: al visitante
-     * doméstico se le asigna un /64 entero, así que puede estrenar dirección en
-     * cada petición sin coste. Comprobado contra el jar: 20 peticiones rotando
-     * {@code 2001:db8:1:1::N} pasaban enteras con el cupo por hora en 15, y solo
-     * las frenaba el tope diario global. El /64 es el bloque más pequeño que se
-     * reparte de una pieza, así que es la unidad que de verdad cuesta conseguir.
+     * En IPv4 el cupo va por dirección; en IPv6, por /64, porque a un visitante
+     * doméstico se le asigna un /64 entero y rotar dentro de él no le cuesta nada:
+     * con cupo por dirección pasaban 20 peticiones seguidas contra un límite de 15.
      */
     private String bucketOf(String host) {
         try {
@@ -145,17 +139,13 @@ public class ChatRateLimitFilter implements WebFilter {
     }
 
     /**
-     * Dos cupos sobre la misma red: el de la hora frena las rachas, y el del día
-     * impide que una sola se lleve el presupuesto diario entero. Sin el segundo,
-     * 15 mensajes/hora bastaban para que una máquina vaciara en una tarde la
-     * cuota del día —hoy, 50 peticiones del tier gratuito de OpenRouter— y
-     * dejara el chat mudo para cualquier visitante.
+     * El cupo de la hora frena las rachas; el del día impide que una sola red se
+     * lleve el presupuesto entero (a 15/hora, una máquina vaciaba en una tarde las
+     * 50 peticiones diarias del tier gratuito y dejaba el chat mudo para todos).
      */
     private boolean ipBudgetSpent(String ip) {
-        // Un mapa sin tope sería su propio vector de abuso: muchas IPs falsas
-        // podrían hincharlo hasta agotar la memoria. Podar tira de paso la cuenta
-        // del día de esa red, pero para llegar aquí harían falta más redes
-        // distintas de las que el tope diario global deja pasar.
+        // Un mapa sin tope sería su propio vector de abuso. Podar tira la cuenta del
+        // día de esa red, pero llegar aquí exige más redes de las que deja el tope global.
         if (perIp.size() > MAX_TRACKED_IPS) {
             perIp.entrySet().removeIf(entry -> entry.getValue().idle());
         }

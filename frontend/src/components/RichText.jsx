@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 
-// Convierte los **...** de las traducciones en <strong>, construyendo nodos React.
-// No usa innerHTML/dangerouslySetInnerHTML, así que no hay riesgo de inyección.
+// Construye nodos React en vez de usar dangerouslySetInnerHTML: el texto sale de
+// las traducciones hoy, pero un <strong> no justifica abrir esa puerta.
 export default function RichText({ children }) {
   const parts = String(children).split(/(\*\*[^*]+\*\*)/g)
 

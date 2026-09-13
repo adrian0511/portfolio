@@ -14,28 +14,20 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
 /**
- * Portero de {@code GET /api/projects}: exige que la cabecera traiga el mismo
- * token que la cookie {@code XSRF-TOKEN} (double-submit, igual que el chat).
+ * Portero de {@code GET /api/projects}: la cabecera tiene que traer el mismo
+ * token que la cookie {@code XSRF-TOKEN}.
  *
- * <p><b>Por qué no lo hace el CSRF de Spring Security.</b> Este es un GET, y el
- * mecanismo nativo ignora por diseño los métodos seguros (GET, HEAD, OPTIONS,
- * TRACE): configurado, dejaría pasar la petición siempre, y no hay opción para
- * cambiarlo. El POST del chat sí va por el nativo, que es donde encaja.
+ * <p><b>No es protección CSRF</b>, y por eso no lo hace el mecanismo nativo: no
+ * hay sesión autenticada que forjar, y además este es un GET, que Spring Security
+ * ignora por diseño. Es una barrera blanda contra llamadas directas y scraping —
+ * descartar la cookie solo cuesta una petición más, de ahí que el chat lleve
+ * además cupos de uso. El POST del chat sí va por el CSRF nativo.
  *
- * <p><b>Por qué contra la cookie y no contra la sesión.</b> Antes el token se
- * guardaba en la {@code WebSession}, así que pedirlo creaba estado en servidor:
- * unas miles de peticiones llenaban el almacén de sesiones y la web respondía
- * 500 a todo el mundo. Validar contra la cookie que Spring Security ya emite
- * da el mismo portero —siguen haciendo falta cookie y cabecera— con cero
- * estado. De paso, en toda la app hay un único token.
+ * <p>Se valida contra la cookie y no contra la {@code WebSession}: guardar el
+ * token en sesión convertía cada petición en estado de servidor, y con el
+ * almacén lleno (10.000) la web respondía 500 a todo el mundo.
  *
- * <p><b>Y qué es esto en realidad.</b> No es protección CSRF: no hay sesión
- * autenticada ni efecto de lado que un tercero pueda forjar leyendo repos
- * públicos. Es un portero blando contra llamadas directas y scraping. Como
- * barrera es débil a propósito: descartar la cookie solo cuesta una petición
- * más, por eso el chat tiene además cupos de uso.
- *
- * <p>Responde 404 y no 403 para no confirmar siquiera que el endpoint existe.
+ * <p>Responde 404 y no 403 para no confirmar que el endpoint existe.
  */
 @Component
 @Order(-100)
