@@ -85,6 +85,44 @@ class ChatControllerTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void recortaCadaTurnoDelHistorial() {
+        // El tope de la pregunta no servía de nada mientras cada turno viajara sin
+        // límite: el techo real era el del cuerpo HTTP (256 KB), y se comprobó con
+        // curl que 200 KB de historial llegaban enteros al prompt. (Se usan 100 KB
+        // por turno para no chocar con ese techo de 256 KB, que sigue vigente.)
+        when(chatService.answer(anyString(), anyList())).thenReturn(Flux.just("ok"));
+
+        post(new ChatRequest("¿Y ahora?", List.of(
+                new ChatRequest.ChatTurn("user", "a".repeat(100_000)),
+                new ChatRequest.ChatTurn("assistant", "b".repeat(100_000)))));
+
+        ArgumentCaptor<List<Message>> captor = ArgumentCaptor.forClass(List.class);
+        verify(chatService).answer(anyString(), captor.capture());
+
+        // El turno de usuario es una pregunta pasada: mismo tope que la pregunta.
+        assertThat(captor.getValue().get(0).getContent()).hasSize(500);
+        // El del asistente lo generó el modelo, que da para más.
+        assertThat(captor.getValue().get(1).getContent()).hasSize(2000);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void noRecortaUnHistorialDeTamanoNormal() {
+        when(chatService.answer(anyString(), anyList())).thenReturn(Flux.just("ok"));
+
+        post(new ChatRequest("¿Y ahora?", List.of(
+                new ChatRequest.ChatTurn("user", "¿Qué stack usa?"),
+                new ChatRequest.ChatTurn("assistant", "Java y Spring Boot."))));
+
+        ArgumentCaptor<List<Message>> captor = ArgumentCaptor.forClass(List.class);
+        verify(chatService).answer(anyString(), captor.capture());
+
+        assertThat(captor.getValue().get(0).getContent()).isEqualTo("¿Qué stack usa?");
+        assertThat(captor.getValue().get(1).getContent()).isEqualTo("Java y Spring Boot.");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void elClienteNoPuedeColarMensajesDeSistema() {
         when(chatService.answer(anyString(), anyList())).thenReturn(Flux.just("ok"));
 

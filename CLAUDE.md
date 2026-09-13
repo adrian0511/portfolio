@@ -47,7 +47,7 @@ portfolio/
 │       │   ├── global.css      # todo el estilo (copia evolucionada del styles.css original)
 │       │   └── fonts.css       # @font-face de las fuentes autoalojadas (importado por global.css)
 │       ├── api/
-│       │   ├── client.js       # getCsrfToken() + getProjects(token)
+│       │   ├── client.js       # ensureCsrfCookie() + getProjects(token) + streamChat()
 │       │   └── client.test.js
 │       ├── i18n/
 │       │   ├── LanguageContext.jsx    # LanguageProvider/useLanguage: detecta/persiste es|en
@@ -78,15 +78,20 @@ portfolio/
 │   │   │   │   ├── RepoDTO.java                 # respuesta hacia el frontend
 │   │   │   │   └── GithubRepoResponse.java       # mapea la respuesta de GitHub
 │   │   │   └── security/
-│   │   │       ├── config/SecurityConfig.java   # WebFlux security (csrf disable, CSP, permitAll)
-│   │   │       └── filter/CsrfValidationFilter.java  # valida X-CSRF-Token en /api/projects
+│   │   │       ├── config/
+│   │   │       │   ├── SecurityConfig.java           # WebFlux security (CSRF nativo, CSP, permitAll)
+│   │   │       │   └── TrustedClientIpTransformer.java  # IP real del visitante (X-Forwarded-For)
+│   │   │       └── filter/
+│   │   │           ├── CsrfValidationFilter.java     # valida X-CSRF-Token en GET /api/projects
+│   │   │           └── CsrfCookieFilter.java         # fuerza la cookie XSRF-TOKEN en /api/**
 │   │   └── resources/
 │   │       └── application.properties           # (static/ ya NO existe: lo genera el build de React)
 │   └── test/java/com/adrian/portfolio/
 │       ├── PortfolioApplicationTests.java        # context load test
 │       ├── CsrfFlowIntegrationTest.java          # flujo csrf-token -> projects de punta a punta
-│       ├── controller/CsrfTokenControllerTest.java
+│       ├── ChatCsrfIntegrationTest.java          # CSRF nativo sobre POST /api/chat
 │       ├── controller/ProjectControllerTest.java
+│       ├── security/config/TrustedClientIpTransformerTest.java
 │       ├── security/filter/CsrfValidationFilterTest.java
 │       └── service/GitHubServiceTest.java        # WebClient con exchangeFunction fake (sin red)
 └── target/                                       # build output (ignored); el jar incluye React en static/
@@ -154,16 +159,21 @@ cd frontend && npm run dev        # frontend en :5173 (o 5174 si está ocupado)
 
 El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` + `hooks/useProjects.js`):
 
-1. **`GET /api/csrf-token`** — al montar `<Projects>`. Devuelve `{ "token": "<uuid>" }`. El token se guarda en la sesión (`ServerWebExchange` session) y el backend setea la cookie `SESSION`.
-2. **`GET /api/projects`** — se llama con el header **`X-CSRF-Token: <token>`** y `credentials: 'include'` (para que viaje la cookie de sesión). Devuelve `List<RepoDTO>`.
+Hay **un solo token** en toda la app: el del CSRF de Spring Security, que viaja en la cookie `XSRF-TOKEN` (legible por JS) y se devuelve en la cabecera `X-XSRF-TOKEN`.
+
+1. **`GET /api/csrf-token`** — solo si la cookie aún no está (`ensureCsrfCookie`). Responde **204** y emite la cookie; **no crea sesión ni guarda nada en servidor**.
+2. **`GET /api/projects`** — con la cabecera **`X-XSRF-TOKEN: <token>`** y `credentials: 'include'`. Devuelve `List<RepoDTO>`.
+3. **`POST /api/chat`** — mismo token, misma cabecera. Lo valida el CSRF nativo.
+
+Ver "Los dos mecanismos CSRF" más abajo para por qué el GET y el POST se validan en sitios distintos con el mismo token.
 
 ### Endpoints
 
 | Método | Ruta                | Auth / Header requerido        | Respuesta |
 |--------|---------------------|--------------------------------|-----------|
-| GET    | `/api/csrf-token`   | ninguno                        | `{ token: string }` |
-| GET    | `/api/projects`     | `X-CSRF-Token` (validado en filtro) | `RepoDTO[]` |
-| POST   | `/api/chat`         | `X-CSRF-Token` + cupo de sesión | `text/event-stream` de fragmentos |
+| GET    | `/api/csrf-token`   | ninguno                        | `204` + `Set-Cookie: XSRF-TOKEN` |
+| GET    | `/api/projects`     | `X-XSRF-TOKEN` (filtro propio, contra la cookie) | `RepoDTO[]` |
+| POST   | `/api/chat`         | `X-XSRF-TOKEN` (CSRF nativo) + cupos | `text/event-stream` de fragmentos |
 
 ### `RepoDTO` (contrato con el frontend)
 ```json
@@ -181,14 +191,53 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 ### Detalles del backend relevantes para el frontend
 - **`GitHubService`**: pide los repos del usuario a `api.github.com`, filtra forks / repo homónimo / sin descripción, toma los primeros N (5), mapea a `RepoDTO`. `getAllRepos()` devuelve esa misma lista **sin recortar** (la consume el chat), cacheada aparte con el mismo TTL. Cachea la respuesta en memoria (`Mono.cache(ttl)`, TTL vía `github.cache-ttl-seconds`) para no repetir la llamada a GitHub en cada visita. Timeout 7s. Si GitHub falla, devuelve una **lista fallback hardcodeada** de 5 proyectos (nunca rompe).
 - **Curación de topics** (`GitHubService.pickTopics`): un repo suele traer 10-16 topics, de los que solo se muestran **3**. Se descartan los genéricos (`NOISE_TOPICS`: backend, full-stack…) y el que repite el lenguaje; se priorizan los conceptuales (`CONCEPT_TOPICS`: arquitectura, seguridad, dominio) con un tope de 2 para **reservar hueco al stack**; y `SYNONYM_GROUPS` evita mostrar dos etiquetas que dicen lo mismo (p. ej. `jwt-authentication` + `security`). El resultado es **determinista**: antes se elegía un topic al azar y cambiaba al expirar la caché.
-- **`CsrfValidationFilter`** (`@Order(-100)`): intercepta **solo** `/api/projects`. Si falta el header o no coincide con el token en sesión → responde `404`. El frontend, ante error, muestra su propio fallback (estado `error` en `useProjects`).
-- **Cookie de sesión** (`SecurityConfig.webSessionIdResolver`): `HttpOnly` + `SameSite=Lax` + `Secure` condicional (`session.cookie.secure`, o `SESSION_COOKIE_SECURE=true` en Railway). Secure no puede ir fijo porque en local se sirve por HTTP y el navegador descartaría la cookie, rompiendo el flujo CSRF.
-- **`SecurityConfig`**: CSRF de Spring **deshabilitado** (se usa el filtro custom), CSP propia (`script-src 'self'`, `font-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, etc.), todo `permitAll`. También desactiva el `cache()` por defecto de Spring Security, que ponía `no-store` en **toda** respuesta e impedía cachear los estáticos.
+- **`CsrfValidationFilter`** (`@Order(-100)`): intercepta **solo** `/api/projects`. Si falta la cabecera, falta la cookie, o no coinciden → responde `404`. Compara en **tiempo constante** (`MessageDigest.isEqual`). El frontend, ante error, muestra su propio fallback (estado `error` en `useProjects`).
+- **`TrustedClientIpTransformer`** (bean `forwardedHeaderTransformer`): resuelve la IP del visitante desde el **último** valor de `X-Forwarded-For`, no del primero, e ignora la cabecera estándar `Forwarded`. Ver "La IP del visitante" más abajo — sin esto el cupo por IP del chat no valía nada.
+- **`CsrfCookieFilter`** (sin `@Order`, el último): el `Mono<CsrfToken>` que Spring Security deja en el exchange es **perezoso** — la cookie `XSRF-TOKEN` no se escribe hasta que alguien se suscribe, y aquí no hay plantilla de servidor que lo haga. Este filtro se suscribe. Solo en `/api/**`: son las únicas respuestas `no-store`, y emitir la cookie junto a un asset `immutable` dejaría que una caché compartida sirviera **el mismo token a todos los visitantes**. Va sin `@Order` (el último) porque tiene que correr por detrás del `WebFilterChainProxy` de Spring Security (orden `-100`), que es quien pone el atributo.
+- **Cookie de sesión** (`SecurityConfig.webSessionIdResolver`): `HttpOnly` + `SameSite=Lax` + `Secure` condicional (`session.cookie.secure`, o `SESSION_COOKIE_SECURE=true` en Railway). Secure no puede ir fijo porque en local se sirve por HTTP y el navegador descartaría la cookie. **Quien crea sesiones ahora es solo `ChatRateLimitFilter`**, y únicamente después de pasar los cupos diario y de IP — así el número de sesiones al día queda acotado por el propio cupo. Ver "El almacén de sesiones" abajo.
+- **`SecurityConfig`**: CSRF de Spring **activo** para el POST del chat, con `CookieServerCsrfTokenRepository.withHttpOnlyFalse()` (el token lo tiene que leer el JS del navegador) y `ServerCsrfTokenRequestAttributeHandler` **plano**: el handler por defecto en Spring Security 7 es el XOR (protección BREACH), que enmascara el token por petición y lo espera enmascarado de vuelta — incompatible con un cliente que devuelve el valor tal cual lo lee de la cookie. BREACH no aplica aquí: el token no se incrusta en el HTML comprimido, viaja en un `Set-Cookie`. La cookie `XSRF-TOKEN` sale con `SameSite=Lax` y `Secure` condicional, igual que la de sesión. CSP propia (`script-src 'self'`, `font-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, etc.), todo `permitAll`. También desactiva el `cache()` por defecto de Spring Security, que ponía `no-store` en **toda** respuesta e impedía cachear los estáticos.
 - **`CacheControlFilter`** (`@Order(-90)`): fija `Cache-Control` por ruta en `beforeCommit` (para ganar al manejador de estáticos):
   - `/assets/**` y `/fonts/**` → `public, max-age=31536000, immutable` (Vite pone hash de contenido en el nombre; **sustituir una fuente obliga a renombrarla**).
   - `/img/**`, `/docs/**`, `/favicon.svg` → `public, max-age=86400` (nombres estables que sí cambian: avatar, CV).
   - Resto, incluidos `index.html` y `/api/**` → `no-store`. **`index.html` nunca debe cachearse**: es quien apunta a los assets con hash, y cachearlo impediría que llegara un despliegue nuevo.
-- La validación CSRF depende de la **sesión** (cookie `SESSION`). En dev el proxy de Vite preserva la cookie; en el jar es same-origin y funciona directo.
+- La validación CSRF depende de la **cookie** `XSRF-TOKEN`, no de la sesión. En dev el proxy de Vite la preserva; en el jar es same-origin y funciona directo.
+
+### Los dos mecanismos CSRF (decisión consciente)
+
+Conviven dos, y no es un descuido:
+
+| Endpoint | Quién valida | Por qué |
+|---|---|---|
+| `GET /api/projects` | `CsrfValidationFilter` propio | El nativo **no puede**: ignora los GET |
+| `POST /api/chat` | CSRF nativo de Spring Security | Es exactamente su caso |
+
+**Un solo token para los dos**: la cookie `XSRF-TOKEN` que emite Spring Security, devuelta en `X-XSRF-TOKEN`. El filtro propio no inventa nada, solo aplica el mismo double-submit a un método que el nativo no cubre.
+
+**Por qué el filtro propio en `/api/projects`.** Es un **GET**, y el CSRF de Spring ignora por diseño los métodos seguros (GET, HEAD, OPTIONS, TRACE): configurado, dejaría pasar la petición siempre, y no hay opción para cambiarlo. El default es literalmente incapaz de hacer lo que hace ese filtro.
+
+**Y qué es en realidad.** No es protección CSRF: no hay sesión autenticada ni efecto de lado que un tercero pueda forjar leyendo repos públicos. Es un **portero blando** contra llamadas directas y scraping — obliga a encadenar dos peticiones con cookie. Como barrera es débil a propósito: descartar la cookie solo cuesta una petición más, por eso el chat tiene además cupos de uso. El `404` (en vez de `403`) es para no confirmar siquiera que el endpoint existe.
+
+**Antes iba contra la sesión, y eso era un fallo de disponibilidad.** El token se generaba en `/api/csrf-token` y se guardaba en la `WebSession`, lo que convertía ese endpoint —público, sin cupo y sin necesidad de cookie— en una fábrica de sesiones. Ver "El almacén de sesiones" abajo.
+
+**Por qué el chat sí va por el nativo.** Es un POST con efecto real (gasta cuota del modelo): ahí la semántica CSRF aplica de verdad y el mecanismo estándar la cubre sin código propio. Antes usaba el filtro custom, lo que era reimplementar algo que el framework ya hacía mejor.
+
+**No hay colisión posible** porque ya no hay dos tokens ni dos nombres de cabecera. Ojo si alguna vez se toca: `HttpHeaders` de Spring es case-insensitive, así que `X-CSRF-Token` y `X-CSRF-TOKEN` serían la misma cabecera.
+
+### El almacén de sesiones (por qué el token ya no vive en la sesión)
+
+`InMemoryWebSessionStore` tiene un tope de **10.000 sesiones** y, al llegar, lanza `IllegalStateException` en vez de descartar las viejas. Con el token CSRF guardado en la sesión, `GET /api/csrf-token` creaba una sesión por llamada, sin cupo y sin necesidad de traer cookie: **~10.000 peticiones y la web respondía 500 a todo visitante** durante los 30 minutos que tarda una sesión en caducar. Reproducido con curl en segundos; el chat quedaba inutilizable y los proyectos caían al respaldo del frontend.
+
+El arreglo no es ponerle un cupo: es **no guardar nada**. El token vive en la cookie, `/api/csrf-token` responde 204, y el único sitio que crea sesión es `ChatRateLimitFilter`, ya detrás de los cupos. Hay test de regresión (`CsrfFlowIntegrationTest.pedirElTokenNoCreaSesionEnServidor`) que falla si alguien vuelve a escribir en la sesión desde ahí.
+
+### La IP del visitante (`TrustedClientIpTransformer`)
+
+`server.forward-headers-strategy=framework` hace que Spring saque la IP de `X-Forwarded-For`, y coge el valor **más a la izquierda** (`ForwardedHeaderUtils.parseForwardedFor` → `getLeftMostValue`). Como un proxy **añade** la IP real por la derecha, el valor izquierdo es siempre el que escribió el cliente: mandar `X-Forwarded-For: <lo que sea>` estrenaba un cupo limpio en cada petición y **dejaba inútil el límite por IP**, que es la barrera de la que depende el gasto del chat. La cabecera estándar `Forwarded` daba una segunda vía. Verificado con curl, incluida la forma exacta que produce Railway (`"7.7.7.7, 127.0.0.1"`).
+
+No se puede arreglar en un `WebFilter`: el transformer **borra** las cabeceras `X-Forwarded-*` antes de que corra ninguno. Tampoco por configuración — el stack reactivo no tiene lista de proxies de confianza, y el javadoc de Spring lo dice sin rodeos: *"An application cannot know if forwarded headers were added by a trusted proxy or by a malicious client"*. Así que se sustituye el bean `forwardedHeaderTransformer` por uno que coge el **último** valor, que es el que pone Railway y a cuya derecha el cliente no puede escribir.
+
+**Asume exactamente un proxy delante.** Si se mete otra capa (una CDN sobre Railway), todos los visitantes compartirían cupo: molesto, pero falla **cerrado**, que es como debe fallar un límite de uso. Lo que no se puede es volver a confiar en el valor de la izquierda.
+
+**Orden de filtros**: el `WebFilterChainProxy` de Spring Security va en `-100`, así que el 403 por CSRF inválido ocurre **antes** de `ChatRateLimitFilter` (`-95`): una petición sin token no consume cupo.
 
 ### Secciones / componentes React
 - `CustomCursor` — cursor custom con lag (solo mouse fino).
@@ -225,15 +274,16 @@ El frontend consume el backend con este flujo (ver `frontend/src/api/client.js` 
 ./mvnw test
 ```
 - `GitHubServiceTest` — unitario, sin red: construye el `WebClient` con `exchangeFunction(...)` fake para simular respuestas de GitHub. Cubre filtrado (forks / repo homónimo / sin descripción), mapeo a `RepoDTO`, fallback ante error, caché (no repite la llamada HTTP), el header `Authorization: Bearer` condicionado a que haya token, y la curación de topics (genéricos descartados, prioridad conceptual, hueco reservado al stack, sinónimos deduplicados, repo sin topics → lista vacía). También `getAllRepos()`: devuelve todos los públicos sin recortar a los destacados, aplica los mismos filtros, cachea aparte y cae al respaldo si GitHub falla.
-- `CsrfValidationFilterTest` — unitario sobre el `WebFilter` con `MockServerWebExchange`: sin header → 404, header que no coincide con la sesión → 404, header válido → deja pasar, rutas distintas de `/api/projects` no se validan.
-- `ChatServiceTest` — el prompt de sistema lleva reglas + perfil + los repos de GitHub (con lenguaje y etiquetas), las descripciones largas se recortan a 220 caracteres para no inflar el prompt, el historial se conserva en orden, y los errores **se propagan** (traducirlos es cosa del advice).
+- `CsrfValidationFilterTest` — unitario sobre el `WebFilter` con `MockServerWebExchange`: cookie y cabecera coincidentes dejan pasar; sin cabecera, sin cookie o sin coincidir → 404; rutas distintas de `/api/projects` no se validan, y `/api/chat` **no pasa por aquí** (lo cubre el CSRF nativo).
+- `TrustedClientIpTransformerTest` — el arreglo de la suplantación de IP: con la IP falsa delante gana la que añade el proxy (una o varias), sin cabecera del cliente se usa la del proxy, la cabecera estándar `Forwarded` se ignora, se toleran espacios y valores vacíos, y **`X-Forwarded-Proto` sigue aplicándose** (si no, se perdería el HSTS en producción).
+- `ChatServiceTest` — el prompt de sistema lleva reglas + perfil + los repos de GitHub (con lenguaje y etiquetas), las descripciones largas se recortan a 220 caracteres para no inflar el prompt, y los errores **se propagan** (traducirlos es cosa del advice). Sobre el historial: viaja como transcripción dentro del turno del visitante (con las etiquetas `Visitante:`/`Asistente:` y el aviso de que puede estar alterada), sin historial el turno es solo la pregunta, y —lo que cierra el agujero— **ningún mensaje de la conversación acaba con rol `assistant`** aunque el cliente lo pida.
 - `ChatExceptionHandlerTest` — cada `statusCode` produce su mensaje (429 límite, 402 sin crédito, config/red genérico) y siempre con 200 + `text/event-stream`.
-- `ChatControllerTest` — pregunta vacía no llega al modelo, recorte a 500 caracteres, historial recortado a 6 turnos, y un turno con rol `system` degradado a `user`.
+- `ChatControllerTest` — pregunta vacía no llega al modelo, recorte a 500 caracteres, historial recortado a 6 turnos, **cada turno recortado por separado** (500 el del visitante, 2.000 el del asistente, con 100 KB de entrada) sin tocar un historial de tamaño normal, y un turno con rol `system` degradado a `user`.
 - `ChatRateLimitFilterTest` — cupo por sesión: dentro pasa, al superarlo 429 sin llamar al modelo, sesiones distintas no comparten cupo, otras rutas no consumen.
 - `CacheControlFilterTest` — la política de caché por ruta: assets con hash y fuentes inmutables, imágenes/CV a un día, y `index.html` + `/api/**` sin cachear nunca (esto último es el que protege los despliegues).
-- `CsrfTokenControllerTest` — `WebTestClient.bindToController(...)`: token no vacío + cookie de sesión, mismo token en la misma sesión, tokens distintos entre sesiones.
 - `ProjectControllerTest` — `WebTestClient.bindToController(...)` con `GitHubService` mockeado: 200 con la lista, 200 con lista vacía, y el camino defensivo 204 (`Mono.empty()`) del controller.
-- `CsrfFlowIntegrationTest` — `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@AutoConfigureWebTestClient`, con `GitHubService` reemplazado por `@MockitoBean`: valida el flujo real csrf-token → cookie + header → `/api/projects`, incluidos los caminos 404 (sin header, o token de otra sesión).
+- `CsrfFlowIntegrationTest` — `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@AutoConfigureWebTestClient`, con `GitHubService` reemplazado por `@MockitoBean`: valida el flujo real csrf-token → cookie + cabecera → `/api/projects`, con sus caminos 404 (sin cabecera, sin cookie, o sin coincidir). Incluye la **regresión que importa**: `pedirElTokenNoCreaSesionEnServidor`, que falla si `/api/csrf-token` vuelve a emitir cookie `SESSION`.
+- `ChatCsrfIntegrationTest` — el CSRF nativo sobre `POST /api/chat`, que al vivir dentro de la cadena de Spring Security solo se puede comprobar con el contexto levantado: una respuesta de `/api/**` emite la cookie, un estático **no** (el caso que protege de las cachés compartidas), y el POST pasa solo si cookie y cabecera coinciden — sin cabecera o con otra, 403 sin llegar al modelo.
 
 ### Frontend (Vitest + @testing-library/react + jsdom)
 ```bash
@@ -242,14 +292,14 @@ npm test          # una pasada (CI)
 npm run test:watch
 npm run lint      # ESLint (flat config + react-hooks)
 ```
-- `api/client.test.js` — `getCsrfToken`/`getProjects` contra `fetch` mockeado: headers/credentials correctos, error si la respuesta no es `ok`, `[]` en `204`.
-- `hooks/useProjects.test.js` — estados `loading` → `success`/`error` mockeando `api/client.js`.
+- `api/client.test.js` — `getProjects` contra `fetch` mockeado: cabecera/credentials correctos, error si la respuesta no es `ok`, `[]` en `204`. Y `ensureCsrfCookie`: devuelve la cookie sin tocar la red si ya está, provoca una respuesta del backend si no, y falla claro si tras eso sigue sin haberla.
+- `hooks/useProjects.test.js` — estados `loading` → `success`/`error` mockeando `api/client.js` (`ensureCsrfCookie` + `getProjects`).
 - `hooks/useRevealOnScroll.test.jsx` — `IntersectionObserver` mockeado: observa los `.rv` al montar, añade `.on` al intersectar, `disconnect()` al desmontar.
 - `i18n/LanguageContext.test.jsx` — detección de idioma (`localStorage` > navegador > default), `setLang` (persistencia, `<html lang>`, idiomas no soportados), error al usar `useLanguage` fuera del provider.
 - `components/MobileDrawer.test.jsx` — el menú móvil ofrece el chat (traducido) y avisa a `App` al pulsarlo.
 - `components/Chat.test.jsx` — el panel lo controla `App`: cerrado solo se ve el lanzador, `open` lo abre desde fuera y `hidden` esconde el lanzador con el menú abierto.
 - `components/RichText.test.jsx`, `LanguageToggle.test.jsx`, `Contact.test.jsx`, `Footer.test.jsx` — comportamiento observable: negritas → `<strong>`, botón de idioma activo/click, CV descargable por idioma, año dinámico.
-- `api/streamChat.test.js` — el parser SSE: reconstruye el texto, aguanta que un evento llegue troceado entre lecturas, une varias líneas `data:` de un mismo evento, y distingue 429 del resto.
+- `api/streamChat.test.js` — el parser SSE: reconstruye el texto, aguanta que un evento llegue troceado entre lecturas, une varias líneas `data:` de un mismo evento, manda el token en `X-XSRF-TOKEN`, y distingue 429 del resto.
 - `hooks/useChat.test.js` — turno de usuario + turno del asistente rellenándose con el stream, preguntas vacías ignoradas, token CSRF reutilizado, y mensajes de límite/error sin romper la UI.
 - `components/ProjectCard.test.jsx` — título legible (y respeto de mayúsculas existentes), chips de lenguaje y topics, ausencia de chips si el repo no trae topics, "actualizado hace X" localizado (con `vi.setSystemTime`) y omitido si no hay `pushed_at`, enlace y descripción de respaldo.
 
@@ -263,7 +313,7 @@ Asistente que responde preguntas sobre el perfil de Adrián, montado sobre **su 
 
 **Por qué existe**: no es una utilidad para el visitante (pocos usarán un chat), es la demostración de una competencia que el portfolio solo afirmaba. De paso justifica WebFlux: hasta ahora el backend reactivo servía un único `GET`; el streaming SSE token a token sí es el caso de uso para el que existe WebFlux.
 
-**Flujo**: `POST /api/chat` → `ChatService` monta `[system(reglas+perfil+repos de GitHub), ...historial, user(pregunta)]` → `ReactiveAiService.stream(...)` → `Flux<String>` → SSE al navegador.
+**Flujo**: `POST /api/chat` (protegido por el **CSRF nativo** de Spring Security: cookie `XSRF-TOKEN` → header `X-XSRF-TOKEN`) → `ChatService` monta exactamente **dos** mensajes, `[system(reglas+perfil+repos de GitHub), user(transcripción previa + pregunta)]` → `ReactiveAiService.stream(...)` → `Flux<String>` → SSE al navegador.
 
 - **`chat/profile.md`** (en `resources/`) es la fuente de datos del asistente sobre Adrián. Ampliar lo que sabe de él = editar ese fichero, sin tocar código.
 - **Los proyectos los lee de GitHub, no del perfil**: `ChatService` pide `GitHubService.getAllRepos()` (todos los repos públicos, no solo los 5 destacados de la portada) y los añade al prompt de sistema. Así el chat puede hablar de un repo recién publicado sin que nadie lo anote a mano — el perfil solo detalla los que merecen contexto extra. Va por la **misma caché** que las tarjetas (TTL `github.cache-ttl-seconds`), así que no supone una llamada a GitHub por mensaje, y si GitHub falla entra la lista de respaldo.
@@ -271,10 +321,11 @@ Asistente que responde preguntas sobre el perfil de Adrián, montado sobre **su 
 - **`ChatExceptionHandler`** (`@RestControllerAdvice`): traduce `AiClientException` a texto útil con **200**, no a un error. Distingue 429 (límite), 402 (sin crédito) y el resto. **Limitación real**: solo captura fallos *previos al primer token* (sin API key, 401, 429, red), que son los habituales porque `stream(...)` falla en la petición inicial. Un fallo a mitad de stream (`STREAM_ERROR`) llega con la respuesta ya comprometida y el visitante vería la respuesta truncada.
 - **`ChatRateLimitFilter`** (`@Order(-95)`): tres cupos, porque el de sesión **por sí solo no protegía nada** — crear una sesión cuesta una petición a `/api/csrf-token`, así que un script que descarte la cookie tenía mensajes ilimitados (verificado con `curl`):
   - **por sesión** (`chat.max-messages-per-session`, 20): cortesía para un navegador normal.
-  - **por IP y hora** (`chat.max-messages-per-ip-per-hour`, 15): la barrera real, porque las IPs sí son un recurso escaso. El mapa se poda para que no sea a su vez un vector de agotamiento de memoria.
+  - **por IP y hora** (`chat.max-messages-per-ip-per-hour`, 15): la barrera real, porque las IPs sí son un recurso escaso. El mapa se poda para que no sea a su vez un vector de agotamiento de memoria. **Depende por completo de `TrustedClientIpTransformer`**: mientras Spring resolvía la IP desde el valor izquierdo de `X-Forwarded-For`, este cupo se saltaba con una cabecera y no protegía nada.
   - **global diario** (`chat.max-messages-per-day`, 150): última línea de defensa; acota el gasto aunque el atacante tenga muchas IPs.
 - **Nada de filtrar por `Origin`/`Referer`**: se comprobó en un navegador real que **no envía `Origin`** en este POST, y `Referrer-Policy: no-referrer` (de Spring Security) impide el `Referer`. Exigir cualquiera de las dos habría bloqueado a los visitantes de verdad.
-- **Topes de entrada en el controller**: pregunta a 500 caracteres y historial a los 6 últimos turnos; los turnos con rol `system` se degradan a `user` para que nadie reescriba las reglas desde el navegador.
+- **Topes de entrada en el controller**: pregunta a 500 caracteres, historial a los 6 últimos turnos, y **cada turno recortado por separado** — 500 los del visitante (un turno suyo es una pregunta pasada), 2.000 los del asistente (los generó el modelo con `ai.max-tokens=600`, no dan para más). Sin ese recorte por turno los otros dos topes no valían nada: el techo real era el del cuerpo HTTP (`spring.codec.max-in-memory-size`, 256 KB), y se comprobó con curl que **200 KB de historial llegaban enteros al prompt**, ~500 veces lo que el tope de la pregunta aparentaba permitir. Los turnos con rol `system` se degradan a `user`.
+- **El historial no se reenvía como turnos de la conversación**: `ChatService` lo mete como **transcripción etiquetada dentro del mensaje del visitante** (`CONVERSACIÓN PREVIA`), con la regla 9 diciendo que lo aporta su navegador y puede estar falseado. El motivo: el cliente elige el rol de cada turno, así que podía **fabricar respuestas del propio asistente** ("Adrián tiene 8 años con Kubernetes") y luego preguntar por ellas; un modelo pondera sus propios turnos previos mucho más que lo que le pida el usuario, así que era el camino corto para sacarle justo lo que las reglas intentan evitar — y la captura de pantalla que un reclutador no debería ver nunca. Ahora **ningún mensaje de la conversación lleva rol `assistant`**, y el contexto del hilo se conserva igual. Tampoco va en el prompt de sistema: ahí el texto del visitante tendría aún más autoridad; el sitio correcto es el turno del usuario.
 - **Sin API key el chat no rompe**: responde con el mensaje de respaldo derivando al email, igual que los proyectos tienen su lista de respaldo.
 
 **Dónde va la API key**:
@@ -333,6 +384,7 @@ de escritorio estrecho el fallo **no aparece**, solo sale un scroll horizontal.
 - **Comentarios solo si son necesarios**: se comenta el *porqué* de una decisión no evidente (un workaround, una restricción externa, una alternativa descartada), nunca el *qué* hace el código. Si el comentario se limita a repetir lo que ya dice el nombre de la función o la línea siguiente, sobra.
 
 ## Notas / deuda técnica conocida
+- **`spring.codec.max-in-memory-size` sigue en su valor por defecto (256 KB)**, que es el techo del cuerpo de `/api/chat`. No se baja a propósito: esa propiedad la aplica Spring Boot también al `WebClient`, y la lista completa de repos de GitHub (`per_page=100`) puede acercarse a ese tamaño. Lo que acota el coste del prompt son los topes por turno del controller, no esta propiedad.
 - **Java 25 requerido para buildear** (`java.version=25` en el `pom.xml`, igual que el Dockerfile). Antes las propiedades decían 21 y el plugin forzaba 25, lo que hacía creer que bastaba un JDK 21.
 - Links del drawer y del `#contact` ya apuntan a los perfiles reales (`github.com/adrian0511`, `linkedin.com/in/adrdev`).
 - Estilos inline ya migrados a CSS en `ProjectCard` (`.pc-link`), `GithubCard` (`.gh-*`) y `Hero` (`.photo-stack`). Quedan algunos sueltos en `Projects` (mensaje de error).
