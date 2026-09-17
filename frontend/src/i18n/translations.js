@@ -13,26 +13,26 @@ export const translations = {
     hero: {
       badge: 'Disponible para trabajar',
       greeting: 'Hola, soy',
-      role: 'Backend Developer.',
+      role: 'Estudiante de DAW.',
       desc:
-        'Desarrollador backend enfocado en **APIs y arquitecturas distribuidas** escalables y resilientes. ' +
-        'Núcleo en **Java & Spring** —microservicios, Kafka, seguridad— y expandiendo hacia Python y Node.js.',
+        'Estudio **Desarrollo de Aplicaciones Web** y construyo **backend con Java & Spring** en ' +
+        'proyectos propios, públicos en GitHub. Aprendiendo también Python y Node.js.',
       ctaProjects: 'Ver proyectos',
       ctaContact: 'Contáctame',
-      chips: ['Open to work', 'Backend', 'Microservicios'],
+      chips: ['Open to work', 'Backend', 'Java'],
       noPhoto: 'Sin foto de perfil',
     },
     about: {
       label: '01 — Sobre mí',
-      heading: ['Backend,', 'arquitectura', 'y buenas prácticas.'],
+      heading: ['Estudiante de DAW', 'que construye', 'proyectos de verdad.'],
       p1:
-        'Desarrollador backend enfocado en construir **APIs robustas** y sistemas bien diseñados con ' +
-        '**Java y Spring**. Me importa que el software sea **escalable, resiliente** y fácil de mantener.',
+        'Estudio el ciclo de **Desarrollo de Aplicaciones Web** y aprendo backend por mi cuenta con ' +
+        '**Java y Spring**. Me importa que el código esté **probado** y sea **fácil de mantener**.',
       p2:
-        'Trabajo arquitecturas de **microservicios y sistemas distribuidos** —Spring Cloud, API Gateway, ' +
-        'Eureka, Kafka, Resilience4j— con foco en **seguridad** (Spring Security, OAuth2). En paralelo, ' +
-        'expando hacia **Python (FastAPI)** y **Node.js (NestJS)** para no atarme a un solo ecosistema.',
-      p3: 'Busco un **equipo** donde seguir creciendo y aportar valor real desde el primer día.',
+        'En mis proyectos he montado **microservicios y sistemas distribuidos** —Spring Cloud, API Gateway, ' +
+        'Eureka, Kafka, Resilience4j— con foco en **seguridad** (Spring Security, OAuth2). En paralelo ' +
+        'aprendo **Python (FastAPI)** y **Node.js (NestJS)** para no atarme a un solo ecosistema.',
+      p3: 'Busco un **equipo** donde aprender de gente con más experiencia y aportar desde el primer día.',
       stackLabel: 'Stack',
       legend: {
         core: 'Dominado',
@@ -53,12 +53,12 @@ export const translations = {
       label: '03 — Contacto',
       heading: ['Trabajemos', 'juntos.'],
       sub:
-        '¿Tienes un proyecto backend interesante o quieres hablar de arquitectura de software? ' +
+        '¿Tienes un proyecto backend o quieres hablar de código? ' +
         'Escríbeme, estaré encantado de hablar contigo.',
       cv: 'Descargar CV',
     },
     footer: {
-      tagline: 'Backend Developer, Java & Spring',
+      tagline: 'Estudiante de DAW · Backend con Java & Spring',
     },
     chat: {
       launcher: 'Pregunta sobre mí',
@@ -72,7 +72,7 @@ export const translations = {
       intro:
         'Respondo con IA a partir del perfil de Adrián. No soy él y puedo equivocarme: ' +
         'para algo importante, escríbele.',
-      samples: ['¿Qué stack domina?', '¿Qué proyectos ha construido?', '¿Está disponible para trabajar?'],
+      samples: ['¿Qué está estudiando?', '¿Qué proyectos ha construido?', '¿Está disponible para trabajar?'],
       error: 'Ahora mismo no puedo responder. Escribe a adriangarces0310@gmail.com.',
       limit: 'Has alcanzado el límite de preguntas de esta sesión. Escribe a adriangarces0310@gmail.com.',
     },
@@ -89,26 +89,26 @@ export const translations = {
     hero: {
       badge: 'Open to work',
       greeting: "Hi, I'm",
-      role: 'Backend Developer.',
+      role: 'Web Development student.',
       desc:
-        'Backend developer focused on scalable, resilient **APIs and distributed architectures**. ' +
-        'Core in **Java & Spring** —microservices, Kafka, security— and expanding into Python and Node.js.',
+        "I'm studying Web Application Development (DAW) and building **backend with Java & Spring** " +
+        'in my own projects, public on GitHub. Also learning Python and Node.js.',
       ctaProjects: 'View projects',
       ctaContact: 'Get in touch',
-      chips: ['Open to work', 'Backend', 'Microservices'],
+      chips: ['Open to work', 'Backend', 'Java'],
       noPhoto: 'No profile photo',
     },
     about: {
       label: '01 — About',
-      heading: ['Backend,', 'architecture', 'and best practices.'],
+      heading: ['A student', 'building real', 'projects.'],
       p1:
-        'Backend developer focused on building **robust APIs** and well-designed systems with ' +
-        '**Java and Spring**. I care about software being **scalable, resilient** and easy to maintain.',
+        "I'm studying **Web Application Development (DAW)** and teaching myself backend with " +
+        '**Java and Spring**. I care about code being **tested** and **easy to maintain**.',
       p2:
-        'I work with **microservices and distributed systems** architectures —Spring Cloud, API Gateway, ' +
-        'Eureka, Kafka, Resilience4j— with a focus on **security** (Spring Security, OAuth2). In parallel, ' +
-        "I'm expanding into **Python (FastAPI)** and **Node.js (NestJS)** so I'm not tied to a single ecosystem.",
-      p3: "I'm looking for a **team** where I can keep growing and deliver real value from day one.",
+        'In my own projects I have built **microservices and distributed systems** —Spring Cloud, API ' +
+        'Gateway, Eureka, Kafka, Resilience4j— with a focus on **security** (Spring Security, OAuth2). ' +
+        "Alongside that I'm learning **Python (FastAPI)** and **Node.js (NestJS)** so I'm not tied to a single ecosystem.",
+      p3: "I'm looking for a **team** where I can learn from more experienced people and contribute from day one.",
       stackLabel: 'Stack',
       legend: {
         core: 'Proficient',
@@ -129,12 +129,12 @@ export const translations = {
       label: '03 — Contact',
       heading: ["Let's work", 'together.'],
       sub:
-        'Got an interesting backend project, or want to talk software architecture? ' +
+        'Got a backend project, or just want to talk code? ' +
         "Feel free to reach out — I'd be glad to talk.",
       cv: 'Download CV',
     },
     footer: {
-      tagline: 'Backend Developer, Java & Spring',
+      tagline: 'Web Development student · Backend with Java & Spring',
     },
     chat: {
       launcher: 'Ask about me',
@@ -148,7 +148,7 @@ export const translations = {
       intro:
         "I answer with AI based on Adrián's profile. I'm not him and I can be wrong: " +
         'for anything important, drop him a line.',
-      samples: ['What is his core stack?', 'What has he built?', 'Is he open to work?'],
+      samples: ['What is he studying?', 'What has he built?', 'Is he open to work?'],
       error: "I can't answer right now. Write to adriangarces0310@gmail.com.",
       limit: "You've reached this session's question limit. Write to adriangarces0310@gmail.com.",
     },

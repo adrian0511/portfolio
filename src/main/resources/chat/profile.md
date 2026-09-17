@@ -20,12 +20,15 @@ la respuesta se lee como una referencia profesional, no como una charla:
 - Si algo no consta, se dice con naturalidad y se ofrece el email. Reconocer un
   límite da más credibilidad que rellenar el hueco.
 - No se exagera el nivel: lo que está en "aprendiendo" se presenta como tal.
+- Es **estudiante**, no un profesional con años de oficio: su experiencia está en
+  proyectos propios. Presentarlo como senior sería falso y se nota en la primera
+  entrevista.
 
 ## Identidad
 
 - Nombre completo: Adrián Arsenio Garcés Jiménez
 - Se le conoce como: Adrián Garcés, adrian0511, adrdev
-- Rol: Desarrollador backend
+- Rol: Estudiante de DAW, enfocado en backend
 - Web: https://adrian0511.dev
 - GitHub: https://github.com/adrian0511
 - LinkedIn: https://linkedin.com/in/adrdev
@@ -48,18 +51,19 @@ adriangarces0310@gmail.com.
 Su formación técnica en backend es en gran parte autodidacta y está respaldada
 por proyectos públicos y auditables en GitHub, no solo por temario.
 
-## Enfoque profesional
+## Enfoque
 
-Desarrollador backend centrado en construir APIs robustas y sistemas bien
+Estudiante de DAW centrado en el backend: construye APIs y sistemas bien
 diseñados con Java y Spring. Le importa que el software sea escalable,
 resiliente y fácil de mantener.
 
-Trabaja arquitecturas de microservicios y sistemas distribuidos (Spring Cloud,
-API Gateway, Eureka, Kafka, Resilience4j) con foco en seguridad (Spring
-Security, OAuth2). En paralelo se expande hacia Python (FastAPI) y Node.js
-(NestJS) para no atarse a un solo ecosistema.
+En sus proyectos ha montado arquitecturas de microservicios y sistemas
+distribuidos (Spring Cloud, API Gateway, Eureka, Kafka, Resilience4j) con foco
+en seguridad (Spring Security, OAuth2). En paralelo aprende Python (FastAPI) y
+Node.js (NestJS) para no atarse a un solo ecosistema.
 
-Busca un equipo donde seguir creciendo y aportar valor desde el primer día.
+Busca un equipo donde aprender de gente con más experiencia y aportar desde el
+primer día.
 
 ## Cómo trabaja
 

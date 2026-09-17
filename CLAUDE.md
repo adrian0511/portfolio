@@ -258,6 +258,20 @@ No se puede arreglar en un `WebFilter`: el transformer **borra** las cabeceras `
 - `setLang` valida contra `SUPPORTED = ['es', 'en']`, persiste en `localStorage` y sincroniza `document.documentElement.lang`.
 - Todo el texto de UI vive en `translations.js` (diccionarios `es`/`en`); el texto con `**negrita**` se renderiza con `RichText`.
 
+### Cómo se presenta Adrián (posicionamiento)
+
+**Estudiante de DAW que construye backend con Java y Spring**, no un especialista con
+experiencia profesional: el ciclo lo empezó en septiembre de 2026 y lo que respalda el
+perfil son proyectos propios. Las capacidades técnicas que la web enseña (microservicios,
+Kafka, seguridad) se atribuyen a esos proyectos, no a un puesto.
+
+Ese mensaje vive en **tres sitios que hay que mover a la vez**: `frontend/src/i18n/translations.js`
+(hero, sobre mí, contacto, footer, en `es` **y** `en`), `frontend/index.html` (title, meta,
+Open Graph, JSON-LD) y `src/main/resources/chat/profile.md` (lo que el asistente puede
+afirmar). Antes estaban desalineados —la portada vendía "especializado" y el chat decía la
+verdad—, y esa contradicción la ve cualquier reclutador que pregunte al chat. El CV en
+`frontend/public/docs/` es un PDF y hay que revisarlo a mano.
+
 ### Comportamiento a preservar
 - Cursor personalizado con lag (solo dispositivos con mouse fino).
 - Nav que se vuelve sólido tras 40px de scroll.
