@@ -27,8 +27,15 @@ html {
     --border2: #222336;
     --accent: #5b8ef0;
     --green: #4ade80;
-    --muted: #454663;
+    /* Rampa de texto: --text > --muted2 (secundario) > --muted (terciario).
+       --muted era #454663, que sobre el fondo da 2,2:1 y se usaba en el texto
+       mas pequeno de la web (.pupdated, .pnum, a 9px): ilegible al sol. El valor
+       de ahora da 4,8:1 sobre las tarjetas, por encima del 4,5 que pide AA, y
+       sigue estando por debajo de --muted2, que es lo que mantiene la jerarquia.
+       El tono viejo vive en --deco: vale para un trazo, nunca para texto. */
+    --muted: #7a7da1;
     --muted2: #8b8daf;
+    --deco: #454663;
     --text: #dde1f5;
     --mono: 'JetBrains Mono', monospace;
     --sans: 'Syne', sans-serif;
@@ -464,7 +471,7 @@ h1 .hl {
 }
 
 h1 .out {
-    -webkit-text-stroke: 1px var(--muted);
+    -webkit-text-stroke: 1px var(--deco);
     color: transparent;
 }
 
@@ -582,7 +589,7 @@ h1 .out {
 .photo-placeholder svg {
     width: 56px;
     height: 56px;
-    stroke: var(--muted);
+    stroke: var(--deco);
     fill: none;
     stroke-width: 1;
 }
