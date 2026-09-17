@@ -265,12 +265,24 @@ experiencia profesional: el ciclo lo empezó en septiembre de 2026 y lo que resp
 perfil son proyectos propios. Las capacidades técnicas que la web enseña (microservicios,
 Kafka, seguridad) se atribuyen a esos proyectos, no a un puesto.
 
-Ese mensaje vive en **tres sitios que hay que mover a la vez**: `frontend/src/i18n/translations.js`
+Ese mensaje vive en **cuatro sitios que hay que mover a la vez**: `frontend/src/i18n/translations.js`
 (hero, sobre mí, contacto, footer, en `es` **y** `en`), `frontend/index.html` (title, meta,
-Open Graph, JSON-LD) y `src/main/resources/chat/profile.md` (lo que el asistente puede
-afirmar). Antes estaban desalineados —la portada vendía "especializado" y el chat decía la
-verdad—, y esa contradicción la ve cualquier reclutador que pregunte al chat. El CV en
-`frontend/public/docs/` es un PDF y hay que revisarlo a mano.
+Open Graph, JSON-LD), `src/main/resources/chat/profile.md` (lo que el asistente puede
+afirmar) y `cv/` (el CV que se descarga). Antes estaban desalineados —la portada vendía
+"especializado" y el chat decía la verdad—, y esa contradicción la ve cualquier reclutador
+que pregunte al chat.
+
+### El CV (`cv/`)
+
+Los PDF de `frontend/public/docs/` **se generan** desde `cv/cv-es.html`, `cv/cv-en.html` y
+`cv/cv.css` con `pwsh cv/render.ps1` (Chrome headless). No se editan a mano: antes solo
+existían los PDF —salidos de un wkhtmltopdf cuyo HTML no estaba en ninguna parte—, así que
+añadir una línea obligaba a rehacer el documento.
+
+El diseño está condicionado por el **ATS** que lee el CV antes que nadie: sin
+`letter-spacing`, sin tablas, una columna, encabezados con los nombres que un ATS busca
+literalmente y fechas `MM/AAAA`. El detalle y cómo comprobarlo, en `cv/README.md`. **Cabe
+en una página justo**: al añadir contenido hay que renderizar y contar páginas.
 
 ### Comportamiento a preservar
 - Cursor personalizado con lag (solo dispositivos con mouse fino).

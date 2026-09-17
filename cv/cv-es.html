@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Adrián Arsenio Garcés Jiménez — CV</title>
+  <link rel="stylesheet" href="cv.css" />
+</head>
+
+<body>
+  <header>
+    <h1>Adrián Arsenio Garcés Jiménez</h1>
+    <p class="headline">Desarrollador Backend · Java &amp; Spring Boot</p>
+    <p class="contact">
+      Mompía, Cantabria, España · +34 603 18 62 98 · adriangarces0310@gmail.com
+    </p>
+    <p class="contact">
+      linkedin.com/in/adrdev · github.com/adrian0511 · adrian0511.dev
+    </p>
+  </header>
+
+  <section>
+    <h2>Perfil</h2>
+    <p>
+      Desarrollador backend autodidacta y estudiante del ciclo superior de Desarrollo de
+      Aplicaciones Web, centrado en Java 21 y Spring Boot. Diseño y publico software de principio
+      a fin: una librería open source en Maven Central y sistemas distribuidos con microservicios y
+      Apache Kafka, aplicando patrones SAGA y Circuit Breaker para garantizar consistencia e
+      idempotencia bajo fallos. Mi enfoque está en completar el ciclo de desarrollo entero —de
+      arquitectura a despliegue— y en resultados medibles, no en acumular tecnologías sueltas.
+    </p>
+  </section>
+
+  <section>
+    <h2>Habilidades técnicas</h2>
+    <p class="skill"><b>Lenguajes y frameworks:</b> Java 21+, Spring Boot, Spring Security, Spring Data JPA, Spring Cloud, NestJS (TypeScript), React</p>
+    <p class="skill"><b>Arquitectura:</b> Microservicios, Apache Kafka (event-driven), Clean Architecture, patrón SAGA (coreografía), Circuit Breaker (Resilience4J)</p>
+    <p class="skill"><b>Seguridad:</b> Esquemas completos de autenticación, autorización y auditoría; OAuth2 (Authorization Code + token relay), estándares SAML/OAuth2, gestión de identidad (IAM)</p>
+    <p class="skill"><b>Datos:</b> PostgreSQL, MySQL, modelado de dominio con JPA</p>
+    <p class="skill"><b>Herramientas:</b> Docker, Docker Compose, Git y GitHub, documentación de API con OpenAPI, CI/CD</p>
+    <p class="skill"><b>Competencias:</b> Colaboración open source (mantenimiento de una librería con colaboradores externos), resolución de problemas en sistemas distribuidos, aprendizaje autónomo demostrado (Java, Spring, Kafka y patrones cloud-native en paralelo a los estudios)</p>
+  </section>
+
+  <section>
+    <h2>Experiencia en proyectos</h2>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="entry-title">Prompt Link <span class="entry-meta">— librería open source · Java 21 · Spring Boot 4 · Maven Central</span></span>
+        <span class="entry-date">03/2026 – Actualidad</span>
+      </div>
+      <ul>
+        <li>Cliente Java reutilizable para IA generativa (OpenRouter: GPT-4, Claude, Llama) con autoconfiguración de Spring Boot, publicado en Maven Central bajo licencia MIT.</li>
+        <li>Diseñé el interceptor de autenticación para que viva únicamente en el contexto del Feign Client de OpenRouter, evitando que la API key se filtrara hacia otros Feign clients de la aplicación consumidora.</li>
+        <li>Implementé manejo de errores tipado (AiClientException) que distingue error HTTP, fallo de red, respuesta inválida y error de configuración mediante códigos de estado propios (-1 a -4).</li>
+        <li>Añadí streaming de tokens sobre WebFlux (Flux&lt;String&gt;) y reintentos configurables con backoff exponencial; publiqué la versión 1.1.0 con 22 commits y 1 fork externo.</li>
+        <li>Documenté en el changelog un fix de seguridad crítico (fuga de API key entre Feign clients) detectado y corregido en la versión 1.0.3.</li>
+      </ul>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="entry-title">OrderFlow <span class="entry-meta">— microservicios · Kafka · OAuth2 · Docker</span></span>
+        <span class="entry-date">04/2026</span>
+      </div>
+      <ul>
+        <li>Plataforma de pedidos con 8 microservicios (Java 21, Spring Boot 4, Spring Cloud), eventos asíncronos con Kafka y seguridad OAuth2 de extremo a extremo.</li>
+        <li>Diseñé el flujo de pedidos con patrón SAGA por coreografía: Order → reserva de stock en Inventory → Payment → confirmación o rollback, coordinado íntegramente vía eventos Kafka.</li>
+        <li>Implementé un Authorization Server propio (OAuth2, flujo Authorization Code) con el Gateway como cliente OAuth2 que valida y propaga el JWT a los microservicios internos (token relay).</li>
+        <li>Añadí Circuit Breaker (Resilience4J) en los Feign clients de product e inventory, e idempotencia por pedido mediante una clave UUID para evitar procesamiento duplicado.</li>
+        <li>Documenté la API con OpenAPI/Swagger en el Gateway y orquesté los 8 servicios con Docker Compose (Kafka + Zookeeper).</li>
+      </ul>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="entry-title">FinanceTracker Monolith-API <span class="entry-meta">— Java 21 · Spring Boot · PostgreSQL · IA</span></span>
+        <span class="entry-date">03/2026 – 08/2026</span>
+      </div>
+      <ul>
+        <li>API de finanzas personales que integra Prompt Link (mi propia librería) para análisis automático de gastos, categorización y un asistente financiero conversacional.</li>
+        <li>Modelé el dominio Usuario → Cuenta → Transacción con aislamiento estricto de datos y reportes financieros dinámicos por mes/año sobre una arquitectura en capas.</li>
+        <li>Aseguré la API con JWT y Spring Security, y centralicé el manejo global de errores con @RestControllerAdvice.</li>
+        <li>Expuse 3 endpoints de IA (análisis automático, chat financiero, categorización) consumiendo mi propia librería en producción, validándola en un caso de uso real.</li>
+      </ul>
+    </div>
+
+    <p class="note">Más proyectos (incluye ChallengeHub: API de gamificación con JWT y control de acceso por roles) en adrian0511.dev y github.com/adrian0511</p>
+  </section>
+
+  <section>
+    <h2>Educación</h2>
+    <div class="entry">
+      <div class="entry-head">
+        <span class="entry-title">Técnico Superior en Desarrollo de Aplicaciones Web (DAW) <span class="entry-meta">— Davante (online)</span></span>
+        <span class="entry-date">09/2026 – Actualidad</span>
+      </div>
+    </div>
+    <div class="entry">
+      <div class="entry-head">
+        <span class="entry-title">Bachillerato <span class="entry-meta">— IPVCE Luis Urquiza Jorge</span></span>
+        <span class="entry-date">2020 – 2023</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Idiomas</h2>
+    <p class="inline-list">Español: nativo · Inglés: A2</p>
+  </section>
+</body>
+
+</html>

@@ -1,0 +1,110 @@
+/* Fuente del CV. Los PDF de frontend/public/docs/ salen de aquí (ver cv/README.md).
+   Todo lo que hay en este fichero está sujeto a una restricción: el CV lo lee
+   primero un ATS, no una persona. De ahí las reglas que parecen limitaciones:
+
+   - Sin letter-spacing. El CV anterior lo usaba en el titular y en los encabezados
+     y el extractor devolvía "D E S A R R O L L A D O R", así que el ATS ni
+     reconocía las secciones ni encontraba "Java" en el titular.
+   - Sin tablas ni columnas. Una columna, orden de lectura = orden del DOM.
+   - Sin iconos ni texto dentro de imágenes: nada de lo que un parser no vea.
+   - Encabezados con los nombres que los ATS buscan literalmente (Experiencia,
+     Educación, Idiomas). */
+
+/* Una página. El CV entra justo, así que tocar tamaños de fuente o márgenes
+   obliga a volver a renderizar y contar páginas (cv/README.md). */
+@page {
+  size: A4;
+  margin: 11mm 13mm;
+}
+
+:root {
+  --ink: #1d2430;
+  --muted: #55606f;
+  --rule: #d9dde3;
+  --accent: #1d2430;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  /* Fuentes de sistema, sin webfonts: un ATS antiguo puede tropezar con una
+     fuente incrustada rara, y aquí no compensa el riesgo. */
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  font-size: 8.5pt;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+h1 {
+  margin: 0;
+  font-size: 17.5pt;
+  font-weight: 700;
+}
+
+.headline {
+  margin: 2px 0 0;
+  font-size: 9.8pt;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.contact {
+  margin: 3px 0 0;
+  font-size: 8.2pt;
+  color: var(--muted);
+}
+
+.contact a { color: inherit; text-decoration: none; }
+
+header {
+  padding-bottom: 5px;
+  border-bottom: 2px solid var(--ink);
+}
+
+section { margin-top: 8px; }
+
+h2 {
+  margin: 0 0 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 9pt;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+p { margin: 0 0 4px; }
+
+.skill { margin: 0 0 2.5px; }
+.skill b { font-weight: 700; }
+
+.entry { margin-bottom: 5px; }
+.entry:last-child { margin-bottom: 0; }
+
+/* El título y la fecha van en la misma línea, pero el título va antes en el DOM:
+   así el parser lee "Prompt Link … 03/2026 – Actualidad" en ese orden. */
+.entry-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.entry-title { font-weight: 700; }
+.entry-meta { font-weight: 400; color: var(--muted); }
+.entry-date { white-space: nowrap; color: var(--muted); font-size: 8.2pt; }
+
+ul {
+  margin: 2px 0 0;
+  padding-left: 14px;
+}
+
+li { margin-bottom: 1.5px; }
+
+.note {
+  margin-top: 4px;
+  font-size: 8.1pt;
+  color: var(--muted);
+}
+
+.inline-list { margin: 0; }
