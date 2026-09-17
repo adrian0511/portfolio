@@ -26,7 +26,7 @@ la respuesta se lee como una referencia profesional, no como una charla:
 
 ## Identidad
 
-- Nombre completo: Adrián Arsenio Garcés Jiménez
+- Nombre completo: Adrián Arsenio Garcés Jimenez
 - Se le conoce como: Adrián Garcés, adrian0511, adrdev
 - Rol: Estudiante de DAW, enfocado en backend
 - Web: https://adrian0511.dev
