@@ -55,11 +55,31 @@ h1 {
   color: var(--muted);
 }
 
-.contact a { color: inherit; text-decoration: none; }
+/* Los enlaces salen clicables en el PDF (Chrome crea la anotación), pero el texto
+   visible sigue siendo la URL legible: el ATS extrae "github.com/adrian0511", no
+   un "aquí" que no le dice nada. Sin subrayado ni azul: en papel sobra. */
+a { color: inherit; text-decoration: none; }
 
 header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8mm;
   padding-bottom: 5px;
   border-bottom: 2px solid var(--ink);
+}
+
+.identity { flex: 1; }
+
+/* Solo en el CV en español: fuera de España la foto en el CV se considera un
+   sesgo y hay reclutadores que descartan por eso. Es decorativa — no lleva
+   texto dentro, así que no se pierde nada al extraer. */
+.photo {
+  width: 21mm;
+  height: 21mm;
+  object-fit: cover;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
 }
 
 section { margin-top: 8px; }

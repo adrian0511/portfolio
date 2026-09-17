@@ -30,6 +30,17 @@ que el gusto. Lo que hay que respetar:
 - **Fechas en `MM/AAAA`**, no "2024 — 2026" a secas.
 - **Fuentes de sistema**, sin webfonts ni iconos: nada que el parser no pueda leer
   como texto.
+- **Los enlaces son clicables pero el texto visible sigue siendo la URL legible**
+  (`github.com/adrian0511`, no "aquí"): la anotación la aprovecha quien lo abre en
+  pantalla y el texto extraído sigue teniendo el dato.
+
+## La foto va solo en el CV en español
+
+`cv-es.html` lleva la foto de la web (`frontend/public/img/Avatar.jpg`); `cv-en.html`
+no. En España la foto es la costumbre, pero en Reino Unido, Irlanda, EEUU o Alemania
+se considera un sesgo y hay quien descarta el CV por llevarla. Para eso hay dos
+versiones. La imagen es decorativa —no lleva texto dentro—, así que no cambia nada
+de lo que extrae el ATS.
 
 Para comprobar qué ve un ATS, extrae el texto del PDF con cualquier parser
 (pdfjs, pdfminer, `pdftotext`) y léelo: si los encabezados no aparecen como
