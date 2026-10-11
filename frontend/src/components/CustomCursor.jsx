@@ -51,22 +51,20 @@ export default function CustomCursor() {
       dot.style.border = 'none'
     }
 
-    document.addEventListener('mousemove', onMove)
-    raf = requestAnimationFrame(loop)
+    // Delegado en document y no un par de listeners por elemento: el querySelectorAll
+    // se hacia al montar, asi que las tarjetas de proyectos, el panel del chat y el
+    // drawer -todo lo que aparece despues- nunca engordaban el cursor.
+    // mouseover/mouseout y no enter/leave, que no burbujean.
+    const onOver = (e) => (e.target.closest('a, button') ? enter() : leave())
 
-    const interactive = document.querySelectorAll('a, button')
-    interactive.forEach((el) => {
-      el.addEventListener('mouseenter', enter)
-      el.addEventListener('mouseleave', leave)
-    })
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseover', onOver)
+    raf = requestAnimationFrame(loop)
 
     return () => {
       document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseover', onOver)
       cancelAnimationFrame(raf)
-      interactive.forEach((el) => {
-        el.removeEventListener('mouseenter', enter)
-        el.removeEventListener('mouseleave', leave)
-      })
     }
   }, [])
 
