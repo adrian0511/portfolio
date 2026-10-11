@@ -16,14 +16,33 @@ updates:
       - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
+  # Ojo al traerse un PR de npm: el package-lock.json hay que regenerarlo con el
+  # npm del build (el del nodeVersion del pom), no con el que lo haya escrito.
+  # Un lock escrito por un npm mas nuevo pasa `npm test` y revienta `npm ci`.
+  # El procedimiento esta en CLAUDE.md.
   - package-ecosystem: npm
     directory: "/frontend"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Decision tomada, no pendiente: React 19 y Vitest 5 se quedan fuera por
+      # ahora. React 19 cambia StrictMode y los refs de funcion (pasan a
+      # devolver cleanup) y toca el runtime que ve el visitante, no solo el
+      # build; Vitest 5 cambia config y matchers, con 67 tests detras. Y
+      # ninguno de los dos aporta seguridad: npm audit esta en 0 desde Vite 8.
+      # Los parches y minors de la linea actual si interesan, que son los que
+      # traen los arreglos.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
 
-  # Las actions estan fijadas por tag mayor (v5), asi que esto solo se mueve
-  # cuando salga una v6; aun asi conviene enterarse.
+  # Las actions estan fijadas por tag mayor, asi que esto solo se mueve cuando
+  # sale uno nuevo. Aqui no hay ignore a proposito: un salto de checkout o de
+  # setup-java solo afecta al CI, asi que si rompe se ve antes de desplegar.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
