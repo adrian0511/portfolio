@@ -42,6 +42,14 @@ class CacheControlFilterTest {
     }
 
     @Test
+    void loQueLeenLosBuscadoresTambienSeCachea() {
+        // Caían en el "resto" y salían no-store: un crawler se los re-descargaba
+        // enteros en cada pasada sin que el contenido hubiera cambiado.
+        assertThat(cacheControlFor("/sitemap.xml")).isEqualTo("public, max-age=86400");
+        assertThat(cacheControlFor("/robots.txt")).isEqualTo("public, max-age=86400");
+    }
+
+    @Test
     void indexHtmlNuncaSeCachea() {
         // Si se cacheara, un despliegue nuevo no llegaría al navegador porque el
         // HTML es quien apunta a los assets con hash.

@@ -31,6 +31,16 @@ public class SecurityConfig {
             "frame-ancestors 'none'",
             "object-src 'none'");
 
+    // La web no pide camara, microfono, ubicacion ni pagos, asi que lo declara:
+    // si un script inyectado llegara a colarse, el navegador le niega la API
+    // antes de que aparezca el aviso de permiso.
+    private static final String PERMISSIONS_POLICY = String.join(", ",
+            "camera=()",
+            "microphone=()",
+            "geolocation=()",
+            "payment=()",
+            "usb=()");
+
     /**
      * {@code Secure} va por variable de entorno y no fijo: en local se sirve por
      * HTTP y el navegador descartaría la cookie.
@@ -81,7 +91,8 @@ public class SecurityConfig {
                         // Su política por defecto (no-store en todo) impedía cachear
                         // los estáticos; CacheControlFilter la sustituye por ruta.
                         .cache(cache -> cache.disable())
-                        .contentSecurityPolicy(csp -> csp.policyDirectives(CSP)))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(CSP))
+                        .permissionsPolicy(policy -> policy.policy(PERMISSIONS_POLICY)))
                 .authorizeExchange(exchanges -> exchanges
                         .anyExchange().permitAll())
                 .build();

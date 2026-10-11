@@ -24,9 +24,11 @@ public class CacheControlFilter implements WebFilter {
     private static final List<String> IMMUTABLE_PATHS = List.of("/assets/", "/fonts/");
     private static final String IMMUTABLE = "public, max-age=31536000, immutable";
 
-    // Nombres estables que sí pueden cambiar (avatar, CV): un día de caché
-    // acelera las visitas repetidas sin dejar el contenido viejo mucho tiempo.
-    private static final List<String> STABLE_NAME_PATHS = List.of("/img/", "/docs/", "/favicon.svg");
+    // Nombres estables que sí pueden cambiar (avatar, CV, lo que leen los
+    // buscadores): un día de caché acelera las visitas repetidas sin dejar el
+    // contenido viejo mucho tiempo.
+    private static final List<String> STABLE_NAME_PATHS = List.of(
+            "/img/", "/docs/", "/favicon.svg", "/sitemap.xml", "/robots.txt");
     private static final String ONE_DAY = "public, max-age=86400";
 
     // index.html referencia los assets con hash, así que nunca debe cachearse:

@@ -28,9 +28,15 @@ import reactor.core.publisher.Mono;
  * almacén lleno (10.000) la web respondía 500 a todo el mundo.
  *
  * <p>Responde 404 y no 403 para no confirmar que el endpoint existe.
+ *
+ * <p>El orden es -99 y no -100: en -100 empataba con el {@code WebFilterChainProxy}
+ * de Spring Security y le ganaba el desempate, asi que el 404 salia sin CSP, sin
+ * HSTS y —lo que importa— sin {@code Cache-Control}, y un 404 sin esa cabecera lo
+ * puede cachear por heuristica una caché compartida y servirselo luego a quien si
+ * trae token. Detras de Security y delante de {@link CacheControlFilter} (-90).
  */
 @Component
-@Order(-100)
+@Order(-99)
 public class CsrfValidationFilter implements WebFilter {
 
     private static final String PROTECTED_PATH = "/api/projects";
