@@ -5,11 +5,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -25,19 +22,15 @@ import reactor.core.publisher.Mono;
 @Log4j2
 public class GitHubService {
 
-    @Autowired
-    private WebClient webClient;
+    private final String username;
+    private final String token;
 
-    @Value("${github.username}")
-    private String username;
-
-    @Value("${github.token}")
-    private String token;
-
-    @Value("${github.cache-ttl-seconds:600}")
-    private long cacheTtlSeconds;
-
-    private final Map<Integer, Mono<List<RepoDTO>>> cache = new ConcurrentHashMap<>();
+    /**
+     * Una sola lista cacheada para las tarjetas y para el chat: son los mismos
+     * repos en el mismo orden, y pedirlas por separado eran dos llamadas a GitHub
+     * por cada expiracion de TTL.
+     */
+    private final Mono<List<RepoDTO>> repos;
 
     // Topics demasiado genéricos: no dicen nada del proyecto en una tarjeta.
     private static final Set<String> NOISE_TOPICS = Set.of(
@@ -64,14 +57,38 @@ public class GitHubService {
     private static final int MAX_TOPICS = 3;
     private static final int MAX_CONCEPT_TOPICS = 2;
 
-    // Clave imposible como limite real: reutiliza el mismo mapa y el mismo TTL
-    // que las tarjetas para cachear la lista completa que consume el chat.
-    private static final int ALL_REPOS = -1;
     private static final int GITHUB_PAGE_SIZE = 100;
+    private static final Duration TIMEOUT = Duration.ofSeconds(7);
 
+    public GitHubService(WebClient webClient,
+            @Value("${github.username}") String username,
+            @Value("${github.token}") String token,
+            @Value("${github.cache-ttl-seconds:600}") long cacheTtlSeconds) {
+        this.username = username;
+        this.token = token;
+        this.repos = fetchRepos(webClient)
+                .collectList()
+                .timeout(TIMEOUT)
+                .onErrorResume(error -> {
+                    log.error("GitHub failed: " + error.getMessage());
+                    return Mono.just(getFallBackRepos());
+                })
+                // Antes de cache(): asi la linea sale en cada fallo de cache real y
+                // no una sola vez al construir la cadena.
+                .doFirst(() -> log.info("Cache miss: pidiendo repos a GitHub"))
+                .cache(Duration.ofSeconds(cacheTtlSeconds));
+    }
+
+    /**
+     * Los primeros {@code limit} de la lista completa, que GitHub ya devuelve
+     * ordenada por push.
+     *
+     * <p>Recortar aqui y no en la peticion: pidiendo {@code per_page=limit*2} la
+     * portada se quedaba corta en silencio cuando los filtros (forks, repo
+     * homonimo, repos sin descripcion) se comian mas de la mitad de esa pagina.
+     */
     public Mono<List<RepoDTO>> getFeaturedRepo(int limit) {
-        return cache.computeIfAbsent(limit,
-                l -> fetchFeaturedRepo(l).cache(Duration.ofSeconds(cacheTtlSeconds)));
+        return repos.map(all -> all.stream().limit(limit).toList());
     }
 
     /**
@@ -80,35 +97,15 @@ public class GitHubService {
      * caben en la portada.
      */
     public Mono<List<RepoDTO>> getAllRepos() {
-        return cache.computeIfAbsent(ALL_REPOS,
-                key -> fetchRepos(GITHUB_PAGE_SIZE)
-                        .collectList()
-                        .timeout(Duration.ofSeconds(7))
-                        .onErrorResume(error -> {
-                            log.error("GitHub failed (lista completa): " + error.getMessage());
-                            return Mono.just(getFallBackRepos());
-                        })
-                        .cache(Duration.ofSeconds(cacheTtlSeconds)));
+        return repos;
     }
 
-    private Mono<List<RepoDTO>> fetchFeaturedRepo(int limit) {
-        return fetchRepos(limit * 2)
-                .take(limit)
-                .collectList()
-                .timeout(Duration.ofSeconds(7))
-                .onErrorResume(error -> {
-                    log.error("GitHub failed: " + error.getMessage());
-                    return Mono.just(getFallBackRepos());
-                });
-    }
-
-    private Flux<RepoDTO> fetchRepos(int perPage) {
-        log.info("Cache miss: pidiendo repos a GitHub (per_page={})", perPage);
+    private Flux<RepoDTO> fetchRepos(WebClient webClient) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/users/{username}/repos")
                         .queryParam("sort", "pushed")
-                        .queryParam("per_page", perPage)
+                        .queryParam("per_page", GITHUB_PAGE_SIZE)
                         .build(username))
                 .headers(headers -> {
                     if (!token.isBlank()) {
@@ -117,8 +114,11 @@ public class GitHubService {
                 })
                 .retrieve()
                 .bodyToFlux(GithubRepoResponse.class)
-                .filter(repo -> !repo.getFork())
-                .filter(repo -> !repo.getName().equalsIgnoreCase(username))
+                // Boolean.TRUE.equals y no !getFork(): el campo es un Boolean, y si
+                // GitHub lo omitiera el NPE lo taparia el onErrorResume y la web
+                // entera pasaria a la lista de respaldo pareciendo correcta.
+                .filter(repo -> !Boolean.TRUE.equals(repo.getFork()))
+                .filter(repo -> !username.equalsIgnoreCase(repo.getName()))
                 .filter(repo -> repo.getDescription() != null)
                 .map(this::toDTO);
     }

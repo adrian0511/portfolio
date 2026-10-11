@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -19,12 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GitHubServiceTest {
 
     private GitHubService buildService(WebClient webClient, String token) {
-        GitHubService service = new GitHubService();
-        ReflectionTestUtils.setField(service, "webClient", webClient);
-        ReflectionTestUtils.setField(service, "username", "adrian0511");
-        ReflectionTestUtils.setField(service, "token", token);
-        ReflectionTestUtils.setField(service, "cacheTtlSeconds", 600L);
-        return service;
+        return new GitHubService(webClient, "adrian0511", token, 600L);
     }
 
     private WebClient webClientReturning(String jsonBody) {
@@ -185,7 +179,9 @@ class GitHubServiceTest {
     }
 
     @Test
-    void getAllRepos_cacheaYNoCompartePeticionConLasTarjetas() {
+    void getAllRepos_comparteLaMismaPeticionConLasTarjetas() {
+        // Antes iban por entradas de cache distintas: dos llamadas a GitHub por
+        // cada expiracion de TTL para traer exactamente los mismos repos.
         AtomicInteger calls = new AtomicInteger();
         WebClient client = WebClient.builder()
                 .exchangeFunction(request -> {
@@ -199,9 +195,46 @@ class GitHubServiceTest {
 
         GitHubService service = buildService(client, "");
         service.getAllRepos().block();
+        service.getFeaturedRepo(5).block();
         service.getAllRepos().block();
 
         assertThat(calls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void losDestacadosNoSeQuedanCortosPorqueLosFiltrosRecortenLaPagina() {
+        // Pidiendo per_page=limit*2 y recortando despues, una racha de forks y
+        // repos sin descripcion dejaba la portada con 3 tarjetas en silencio.
+        StringBuilder json = new StringBuilder("[");
+        for (int i = 0; i < 8; i++) {
+            json.append("{\"name\":\"fork%d\",\"description\":\"d\",\"html_url\":\"x\",\"language\":\"Java\",\"fork\":true,\"topics\":[]},"
+                    .formatted(i));
+        }
+        for (int i = 0; i < 5; i++) {
+            json.append("{\"name\":\"bueno%d\",\"description\":\"d\",\"html_url\":\"x\",\"language\":\"Java\",\"fork\":false,\"topics\":[]}%s"
+                    .formatted(i, i < 4 ? "," : ""));
+        }
+        json.append("]");
+
+        GitHubService service = buildService(webClientReturning(json.toString()), "");
+
+        assertThat(service.getFeaturedRepo(5).block()).hasSize(5);
+    }
+
+    @Test
+    void unRepoSinElCampoForkNoTumbaLaListaEntera() {
+        // El campo es un Boolean: desenvolverlo a pelo lanzaba un NPE que el
+        // onErrorResume convertia en "todo a la lista de respaldo", que es el peor
+        // fallo posible porque la portada se sigue viendo bien.
+        String json = """
+                [
+                  {"name":"sin-campo-fork","description":"d","html_url":"x","language":"Java","topics":[]}
+                ]
+                """;
+
+        assertThat(buildService(webClientReturning(json), "").getAllRepos().block())
+                .extracting(RepoDTO::getName)
+                .containsExactly("sin-campo-fork");
     }
 
     @Test
