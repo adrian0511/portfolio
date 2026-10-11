@@ -33,6 +33,7 @@ portfolio/
 ├── mvnw / mvnw.cmd             # Maven wrapper
 ├── .github/workflows/ci.yml    # tests de backend y frontend + package en cada push/PR
 ├── Dockerfile                  # build multi-stage (JDK -> JRE), usuario no-root
+├── cv/                         # fuente de los PDF del CV (cv-es|en.html, cv.css, render.ps1)
 ├── frontend/                   # FRONTEND REACT
 │   ├── package.json            # scripts: dev, build, preview, test, test:watch, lint
 │   ├── eslint.config.js        # flat config + react-hooks
@@ -57,14 +58,19 @@ portfolio/
 │       │   ├── useRevealOnScroll.js       # IntersectionObserver -> clase .on
 │       │   ├── useRevealOnScroll.test.jsx
 │       │   ├── useProjects.js             # flujo csrf-token -> projects + fallback
-│       │   └── useProjects.test.js
+│       │   ├── useProjects.test.js
+│       │   ├── useChat.js                 # turnos + stream + AbortController (cancel)
+│       │   └── useChat.test.js
 │       ├── test/setup.js       # setup de Vitest (matchers de @testing-library/jest-dom)
 │       └── components/
 │           ├── Navbar.jsx, MobileDrawer.jsx, CustomCursor.jsx, LanguageToggle.jsx
 │           ├── Hero.jsx, About.jsx, Contact.jsx, Footer.jsx
 │           ├── Projects.jsx, ProjectCard.jsx, GithubCard.jsx
+│           ├── Chat.jsx        # lanzador + panel; el estado abierto/cerrado vive en App
+│           ├── ChatText.jsx    # markdown ligero del modelo (negritas, viñetas) -> nodos React
 │           ├── RichText.jsx    # **texto** -> <strong>, sin dangerouslySetInnerHTML
-│           └── *.test.jsx      # tests de RichText, LanguageToggle, Contact, Footer
+│           └── *.test.jsx      # tests de RichText, ChatText, LanguageToggle, Contact, Footer,
+│                               # MobileDrawer, Chat, ProjectCard
 ├── src/
 │   ├── main/
 │   │   ├── java/com/adrian/portfolio/
@@ -72,27 +78,38 @@ portfolio/
 │   │   │   ├── config/AppConfig.java            # Bean WebClient (baseUrl api.github.com)
 │   │   │   ├── controller/
 │   │   │   │   ├── ProjectController.java       # GET /api/projects
-│   │   │   │   └── CsrfTokenController.java      # GET /api/csrf-token
-│   │   │   ├── service/GitHubService.java       # consume GitHub API + cache + fallback
+│   │   │   │   ├── CsrfTokenController.java      # GET /api/csrf-token
+│   │   │   │   ├── ChatController.java          # POST /api/chat + topes de entrada
+│   │   │   │   └── ChatExceptionHandler.java    # fallos del modelo -> texto util con 200
+│   │   │   ├── service/
+│   │   │   │   ├── GitHubService.java           # consume GitHub API + cache + fallback
+│   │   │   │   └── ChatService.java             # prompt de sistema (reglas + perfil + repos)
 │   │   │   ├── dto/
 │   │   │   │   ├── RepoDTO.java                 # respuesta hacia el frontend
-│   │   │   │   └── GithubRepoResponse.java       # mapea la respuesta de GitHub
+│   │   │   │   ├── GithubRepoResponse.java       # mapea la respuesta de GitHub
+│   │   │   │   └── ChatRequest.java             # pregunta + historial que manda el navegador
 │   │   │   └── security/
 │   │   │       ├── config/
 │   │   │       │   ├── SecurityConfig.java           # WebFlux security (CSRF nativo, CSP, permitAll)
 │   │   │       │   └── TrustedClientIpTransformer.java  # IP real del visitante (X-Forwarded-For)
 │   │   │       └── filter/
-│   │   │           ├── CsrfValidationFilter.java     # valida X-CSRF-Token en GET /api/projects
-│   │   │           └── CsrfCookieFilter.java         # fuerza la cookie XSRF-TOKEN en /api/**
+│   │   │           ├── CsrfValidationFilter.java     # (-99) valida X-XSRF-TOKEN en GET /api/projects
+│   │   │           ├── ChatRateLimitFilter.java      # (-95) cupos del chat: sesion, red/hora, red/dia, global
+│   │   │           ├── CacheControlFilter.java       # (-90) Cache-Control por ruta
+│   │   │           └── CsrfCookieFilter.java         # (el ultimo) fuerza la cookie XSRF-TOKEN en /api/**
 │   │   └── resources/
-│   │       └── application.properties           # (static/ ya NO existe: lo genera el build de React)
+│   │       ├── application.properties           # (static/ ya NO existe: lo genera el build de React)
+│   │       └── chat/profile.md                  # lo que el asistente puede afirmar de Adrian
 │   └── test/java/com/adrian/portfolio/
 │       ├── PortfolioApplicationTests.java        # context load test
 │       ├── CsrfFlowIntegrationTest.java          # flujo csrf-token -> projects de punta a punta
 │       ├── ChatCsrfIntegrationTest.java          # CSRF nativo sobre POST /api/chat
 │       ├── controller/ProjectControllerTest.java
+│       ├── controller/ChatControllerTest.java, ChatExceptionHandlerTest.java
 │       ├── security/config/TrustedClientIpTransformerTest.java
 │       ├── security/filter/CsrfValidationFilterTest.java
+│       ├── security/filter/ChatRateLimitFilterTest.java, CacheControlFilterTest.java
+│       ├── service/ChatServiceTest.java
 │       └── service/GitHubServiceTest.java        # WebClient con exchangeFunction fake (sin red)
 └── target/                                       # build output (ignored); el jar incluye React en static/
 ```
@@ -189,16 +206,20 @@ Ver "Los dos mecanismos CSRF" más abajo para por qué el GET y el POST se valid
 `topics` llega ya curado (máx. 3) y puede venir vacío. `pushed_at` es `null` en la lista de respaldo.
 
 ### Detalles del backend relevantes para el frontend
-- **`GitHubService`**: pide los repos del usuario a `api.github.com`, filtra forks / repo homónimo / sin descripción, toma los primeros N (5), mapea a `RepoDTO`. `getAllRepos()` devuelve esa misma lista **sin recortar** (la consume el chat), cacheada aparte con el mismo TTL. Cachea la respuesta en memoria (`Mono.cache(ttl)`, TTL vía `github.cache-ttl-seconds`) para no repetir la llamada a GitHub en cada visita. Timeout 7s. Si GitHub falla, devuelve una **lista fallback hardcodeada** de 5 proyectos (nunca rompe).
+- **`GitHubService`**: pide los repos del usuario a `api.github.com` (`per_page=100`, `sort=pushed`), filtra forks / repo homónimo / sin descripción y mapea a `RepoDTO`. **Una sola lista cacheada** (`Mono.cache(ttl)`, TTL vía `github.cache-ttl-seconds`) sirve a los dos consumidores: `getAllRepos()` la devuelve entera (la lee el chat) y `getFeaturedRepo(n)` recorta los primeros n (las tarjetas). Timeout 7s. Si GitHub falla, devuelve una **lista fallback hardcodeada** de 5 proyectos (nunca rompe).
+  - **El recorte va al final, no en la petición.** Antes `getFeaturedRepo(5)` pedía `per_page=10` y recortaba después de filtrar, así que una racha de forks o de repos sin descripción entre los diez con push más reciente dejaba la portada con 4 tarjetas o menos **y nada lo indicaba**. De paso eran dos entradas de caché para los mismos repos en el mismo orden: dos llamadas a GitHub por cada expiración de TTL.
+  - **El filtro de forks es `Boolean.TRUE.equals(...)`** y no `!repo.getFork()`: el campo es un `Boolean`, y si GitHub lo omitiera el NPE lo taparía el `onErrorResume` y la web entera caería a la lista de respaldo **pareciendo correcta**, que es el peor fallo posible.
+  - El `log.info("Cache miss")` va en un `doFirst` **antes** del `cache(...)`: así sale en cada fallo de caché real y no una sola vez al construir la cadena.
 - **Curación de topics** (`GitHubService.pickTopics`): un repo suele traer 10-16 topics, de los que solo se muestran **3**. Se descartan los genéricos (`NOISE_TOPICS`: backend, full-stack…) y el que repite el lenguaje; se priorizan los conceptuales (`CONCEPT_TOPICS`: arquitectura, seguridad, dominio) con un tope de 2 para **reservar hueco al stack**; y `SYNONYM_GROUPS` evita mostrar dos etiquetas que dicen lo mismo (p. ej. `jwt-authentication` + `security`). El resultado es **determinista**: antes se elegía un topic al azar y cambiaba al expirar la caché.
-- **`CsrfValidationFilter`** (`@Order(-100)`): intercepta **solo** `/api/projects`. Si falta la cabecera, falta la cookie, o no coinciden → responde `404`. Compara en **tiempo constante** (`MessageDigest.isEqual`). El frontend, ante error, muestra su propio fallback (estado `error` en `useProjects`).
+- **`CsrfValidationFilter`** (`@Order(-99)`): intercepta **solo** `/api/projects`. Si falta la cabecera, falta la cookie, o no coinciden → responde `404`. Compara en **tiempo constante** (`MessageDigest.isEqual`). El frontend, ante error, muestra su propio fallback (estado `error` en `useProjects`).
+  - **El orden es -99 y no -100 por una razón.** En -100 empataba con el `WebFilterChainProxy` de Spring Security y le ganaba el desempate, así que ese 404 salía **sin una sola cabecera**: sin CSP, sin HSTS, sin `X-Content-Type-Options` y sin `Cache-Control`. Reproducido en producción con `curl` (el 403 de `/api/chat`, que sí pasa por la cadena, traía CSP). Lo que importa es el `Cache-Control`: un 404 sin esa cabecera lo puede cachear por heurística una caché compartida (RFC 9111) y servírselo después a un visitante que **sí** trae token. Y el empate en sí era frágil, porque quién corre primero solo lo decidía el orden de descubrimiento de beans.
 - **`TrustedClientIpTransformer`** (bean `forwardedHeaderTransformer`): resuelve la IP del visitante desde el **último** valor de `X-Forwarded-For`, no del primero, e ignora la cabecera estándar `Forwarded`. Ver "La IP del visitante" más abajo — sin esto el cupo por IP del chat no valía nada.
 - **`CsrfCookieFilter`** (sin `@Order`, el último): el `Mono<CsrfToken>` que Spring Security deja en el exchange es **perezoso** — la cookie `XSRF-TOKEN` no se escribe hasta que alguien se suscribe, y aquí no hay plantilla de servidor que lo haga. Este filtro se suscribe. Solo en `/api/**`: son las únicas respuestas `no-store`, y emitir la cookie junto a un asset `immutable` dejaría que una caché compartida sirviera **el mismo token a todos los visitantes**. Va sin `@Order` (el último) porque tiene que correr por detrás del `WebFilterChainProxy` de Spring Security (orden `-100`), que es quien pone el atributo.
 - **Cookie de sesión** (`SecurityConfig.webSessionIdResolver`): `HttpOnly` + `SameSite=Lax` + `Secure` condicional (`session.cookie.secure`, o `SESSION_COOKIE_SECURE=true` en Railway). Secure no puede ir fijo porque en local se sirve por HTTP y el navegador descartaría la cookie. **Quien crea sesiones ahora es solo `ChatRateLimitFilter`**, y únicamente después de pasar los cupos diario y de IP — así el número de sesiones al día queda acotado por el propio cupo. Ver "El almacén de sesiones" abajo.
-- **`SecurityConfig`**: CSRF de Spring **activo** para el POST del chat, con `CookieServerCsrfTokenRepository.withHttpOnlyFalse()` (el token lo tiene que leer el JS del navegador) y `ServerCsrfTokenRequestAttributeHandler` **plano**: el handler por defecto en Spring Security 7 es el XOR (protección BREACH), que enmascara el token por petición y lo espera enmascarado de vuelta — incompatible con un cliente que devuelve el valor tal cual lo lee de la cookie. BREACH no aplica aquí: el token no se incrusta en el HTML comprimido, viaja en un `Set-Cookie`. La cookie `XSRF-TOKEN` sale con `SameSite=Lax` y `Secure` condicional, igual que la de sesión. CSP propia (`script-src 'self'`, `font-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, etc.), todo `permitAll`. También desactiva el `cache()` por defecto de Spring Security, que ponía `no-store` en **toda** respuesta e impedía cachear los estáticos.
+- **`SecurityConfig`**: CSRF de Spring **activo** para el POST del chat, con `CookieServerCsrfTokenRepository.withHttpOnlyFalse()` (el token lo tiene que leer el JS del navegador) y `ServerCsrfTokenRequestAttributeHandler` **plano**: el handler por defecto en Spring Security 7 es el XOR (protección BREACH), que enmascara el token por petición y lo espera enmascarado de vuelta — incompatible con un cliente que devuelve el valor tal cual lo lee de la cookie. BREACH no aplica aquí: el token no se incrusta en el HTML comprimido, viaja en un `Set-Cookie`. La cookie `XSRF-TOKEN` sale con `SameSite=Lax` y `Secure` condicional, igual que la de sesión. CSP propia (`script-src 'self'`, `font-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, etc.) y `Permissions-Policy` negando cámara, micrófono, ubicación, pagos y USB —la web no pide ninguna, así que declararlo es gratis—, todo `permitAll`. También desactiva el `cache()` por defecto de Spring Security, que ponía `no-store` en **toda** respuesta e impedía cachear los estáticos.
 - **`CacheControlFilter`** (`@Order(-90)`): fija `Cache-Control` por ruta en `beforeCommit` (para ganar al manejador de estáticos):
   - `/assets/**` y `/fonts/**` → `public, max-age=31536000, immutable` (Vite pone hash de contenido en el nombre; **sustituir una fuente obliga a renombrarla**).
-  - `/img/**`, `/docs/**`, `/favicon.svg` → `public, max-age=86400` (nombres estables que sí cambian: avatar, CV).
+  - `/img/**`, `/docs/**`, `/favicon.svg`, `/sitemap.xml`, `/robots.txt` → `public, max-age=86400` (nombres estables que sí cambian: avatar, CV, y lo que leen los buscadores — caían en el "resto" y un crawler se los re-descargaba enteros en cada pasada).
   - Resto, incluidos `index.html` y `/api/**` → `no-store`. **`index.html` nunca debe cachearse**: es quien apunta a los assets con hash, y cachearlo impediría que llegara un despliegue nuevo.
 - La validación CSRF depende de la **cookie** `XSRF-TOKEN`, no de la sesión. En dev el proxy de Vite la preserva; en el jar es same-origin y funciona directo.
 
@@ -242,10 +263,10 @@ No se puede arreglar en un `WebFilter`: el transformer **borra** las cabeceras `
 **Orden de filtros**: el `WebFilterChainProxy` de Spring Security va en `-100`, así que el 403 por CSRF inválido ocurre **antes** de `ChatRateLimitFilter` (`-95`): una petición sin token no consume cupo.
 
 ### Secciones / componentes React
-- `CustomCursor` — cursor custom con lag (solo mouse fino).
+- `CustomCursor` — cursor custom con lag (solo mouse fino). El hover va **delegado en `document`** (`mouseover`/`mouseout` + `closest('a, button')`): con un `querySelectorAll` al montar, las tarjetas de proyectos, el panel del chat y el drawer —todo lo que aparece después— no lo activaban nunca.
 - `Navbar` — se vuelve sólido tras 40px de scroll; hamburguesa togglea el drawer; incluye `LanguageToggle`.
 - `LanguageToggle` — botones ES/EN (banderas SVG inline, no emoji) que llaman a `setLang` del `LanguageContext`.
-- `MobileDrawer` — drawer mobile (estado en `App`, cierra con Escape / al navegar). Incluye una entrada al chat de IA: en móvil el botón flotante es un icono fácil de pasar por alto, así que el menú es la segunda vía de entrada. Mientras el drawer está abierto, `App` esconde el botón flotante (`hidden`) para no duplicar la misma acción.
+- `MobileDrawer` — drawer mobile (estado en `App`, cierra con Escape / al navegar). Cerrado lleva **`inert` + `aria-hidden`**: por debajo del breakpoint es `display:flex` también cerrado, y ni `opacity:0` ni `pointer-events:none` sacan nada del orden de tabulación, así que el foco se iba a seis elementos invisibles fuera de pantalla. Incluye una entrada al chat de IA: en móvil el botón flotante es un icono fácil de pasar por alto, así que el menú es la segunda vía de entrada. Mientras el drawer está abierto, `App` esconde el botón flotante (`hidden`) para no duplicar la misma acción.
 - `Hero` — texto + foto (con `onError` → placeholder) + chips.
 - `About` — bio + grid de stack (dominado / aprendiendo / estudiando).
 - `Projects` + `ProjectCard` + `GithubCard` — tarjetas desde la API con fallback. `ProjectCard` muestra chip de lenguaje (logo de `react-icons` tintado con el color de linguist; punto de color como fallback si el lenguaje no tiene logo), título legible (`gym-reservas` → `Gym Reservas`, respetando nombres tipo `RetosConIA`), descripción recortada a 3 líneas (`-webkit-line-clamp`), chips de topics y "actualizado hace X" vía `Intl.RelativeTimeFormat` (sin cadenas de traducción propias para las unidades).
@@ -265,12 +286,17 @@ experiencia profesional: el ciclo lo empezó en septiembre de 2026 y lo que resp
 perfil son proyectos propios. Las capacidades técnicas que la web enseña (microservicios,
 Kafka, seguridad) se atribuyen a esos proyectos, no a un puesto.
 
-Ese mensaje vive en **cuatro sitios que hay que mover a la vez**: `frontend/src/i18n/translations.js`
+Ese mensaje vive en **cinco sitios que hay que mover a la vez**: `frontend/src/i18n/translations.js`
 (hero, sobre mí, contacto, footer, en `es` **y** `en`), `frontend/index.html` (title, meta,
 Open Graph, JSON-LD), `src/main/resources/chat/profile.md` (lo que el asistente puede
-afirmar) y `cv/` (el CV que se descarga). Antes estaban desalineados —la portada vendía
-"especializado" y el chat decía la verdad—, y esa contradicción la ve cualquier reclutador
-que pregunte al chat.
+afirmar), `cv/` (el CV que se descarga) y el `README.md`. Antes estaban desalineados —la
+portada vendía "especializado" y el chat decía la verdad—, y esa contradicción la ve
+cualquier reclutador que pregunte al chat.
+
+El **README** se quedó fuera la primera vez que se alineó todo lo demás, y siguió meses
+diciendo "Portfolio Backend Dev" y hablando de "mi experiencia como desarrollador
+backend". Es lo primero que lee quien llega al repositorio desde la web, así que cuenta
+tanto como la portada.
 
 ### El CV (`cv/`)
 
@@ -283,6 +309,15 @@ El diseño está condicionado por el **ATS** que lee el CV antes que nadie: sin
 `letter-spacing`, sin tablas, una columna, encabezados con los nombres que un ATS busca
 literalmente y fechas `MM/AAAA`. El detalle y cómo comprobarlo, en `cv/README.md`. **Cabe
 en una página justo**: al añadir contenido hay que renderizar y contar páginas.
+
+**El script borra el PDF antes de llamar a Chrome y espera a que el tamaño se
+estabilice.** Las dos cosas arreglan el mismo agujero: el `Test-Path` final pasaba
+siempre que hubiera un PDF de una tirada anterior, así que un fallo de Chrome se saldaba
+con "Listo" y se publicaba el CV viejo creyendo haberlo regenerado —y con los errores de
+Chrome yendo a `2>$null`, sin rastro—. Al borrarlo primero salió lo que eso tapaba: el
+headless nuevo **se desentiende del proceso que escribe el fichero**, así que al volver
+de la llamada el PDF puede no estar todavía y la comprobación fallaba aunque Chrome
+hubiera acabado bien.
 
 ### Comportamiento a preservar
 - Cursor personalizado con lag (solo dispositivos con mouse fino).
@@ -301,14 +336,14 @@ en una página justo**: al añadir contenido hay que renderizar y contar página
 ```bash
 ./mvnw test
 ```
-- `GitHubServiceTest` — unitario, sin red: construye el `WebClient` con `exchangeFunction(...)` fake para simular respuestas de GitHub. Cubre filtrado (forks / repo homónimo / sin descripción), mapeo a `RepoDTO`, fallback ante error, caché (no repite la llamada HTTP), el header `Authorization: Bearer` condicionado a que haya token, y la curación de topics (genéricos descartados, prioridad conceptual, hueco reservado al stack, sinónimos deduplicados, repo sin topics → lista vacía). También `getAllRepos()`: devuelve todos los públicos sin recortar a los destacados, aplica los mismos filtros, cachea aparte y cae al respaldo si GitHub falla.
+- `GitHubServiceTest` — unitario, sin red: construye el `WebClient` con `exchangeFunction(...)` fake para simular respuestas de GitHub. Cubre filtrado (forks / repo homónimo / sin descripción), mapeo a `RepoDTO`, fallback ante error, caché (no repite la llamada HTTP), el header `Authorization: Bearer` condicionado a que haya token, y la curación de topics (genéricos descartados, prioridad conceptual, hueco reservado al stack, sinónimos deduplicados, repo sin topics → lista vacía). También `getAllRepos()`: devuelve todos los públicos sin recortar a los destacados, aplica los mismos filtros y cae al respaldo si GitHub falla. Y las dos regresiones del recorte: que las tarjetas **comparten la misma petición** que el chat (antes eran dos), que **no se quedan cortas** porque los filtros se coman la primera página, y que un repo **sin el campo `fork`** no tumba la lista entera al respaldo.
 - `CsrfValidationFilterTest` — unitario sobre el `WebFilter` con `MockServerWebExchange`: cookie y cabecera coincidentes dejan pasar; sin cabecera, sin cookie o sin coincidir → 404; rutas distintas de `/api/projects` no se validan, y `/api/chat` **no pasa por aquí** (lo cubre el CSRF nativo).
 - `TrustedClientIpTransformerTest` — el arreglo de la suplantación de IP: con la IP falsa delante gana la que añade el proxy (una o varias), sin cabecera del cliente se usa la del proxy, la cabecera estándar `Forwarded` se ignora, se toleran espacios y valores vacíos, y **`X-Forwarded-Proto` sigue aplicándose** (si no, se perdería el HSTS en producción). Y el detector de "más de un proxy delante": qué direcciones cuentan como visitante y cuáles no (privadas, CGNAT, link-local, `fc00::/7`, o texto que no es una IP), incluido que comprobarlo **no resuelve por DNS** un valor que llega en una cabecera.
 - `ChatServiceTest` — el prompt de sistema lleva reglas + perfil + los repos de GitHub (con lenguaje y etiquetas), las descripciones largas se recortan a 220 caracteres para no inflar el prompt, y los errores **se propagan** (traducirlos es cosa del advice). Sobre el historial: viaja como transcripción dentro del turno del visitante (con las etiquetas `Visitante:`/`Asistente:` y el aviso de que puede estar alterada), sin historial el turno es solo la pregunta, y —lo que cierra el agujero— **ningún mensaje de la conversación acaba con rol `assistant`** aunque el cliente lo pida.
 - `ChatExceptionHandlerTest` — cada `statusCode` produce su mensaje (429 límite, 402 sin crédito, config/red genérico) y siempre con 200 + `text/event-stream`.
 - `ChatControllerTest` — pregunta vacía no llega al modelo, recorte a 500 caracteres, historial recortado a 6 turnos, **cada turno recortado por separado** (500 el del visitante, 2.000 el del asistente, con 100 KB de entrada) sin tocar un historial de tamaño normal, y un turno con rol `system` degradado a `user`.
 - `ChatRateLimitFilterTest` — cupo por sesión: dentro pasa, al superarlo 429 sin llamar al modelo, sesiones distintas no comparten cupo, otras rutas no consumen. Y los cupos por red: en IPv6 van por **/64** (rotar la dirección dentro del prefijo no estrena cupo) sin que dos prefijos distintos se pisen, una IPv4 mapeada (`::ffff:…`) sigue contando como IPv4, y un valor que no es una IP literal se agrupa tal cual en vez de romper el cupo. Del cupo diario por red: una sola no se lleva el presupuesto del día, otras redes no se ven afectadas, y **lo que frena el cupo de la hora no gasta el del día**.
-- `CacheControlFilterTest` — la política de caché por ruta: assets con hash y fuentes inmutables, imágenes/CV a un día, y `index.html` + `/api/**` sin cachear nunca (esto último es el que protege los despliegues).
+- `CacheControlFilterTest` — la política de caché por ruta: assets con hash y fuentes inmutables, imágenes/CV/`sitemap.xml`/`robots.txt` a un día, y `index.html` + `/api/**` sin cachear nunca (esto último es el que protege los despliegues).
 - `ProjectControllerTest` — `WebTestClient.bindToController(...)` con `GitHubService` mockeado: 200 con la lista, 200 con lista vacía, y el camino defensivo 204 (`Mono.empty()`) del controller.
 - `CsrfFlowIntegrationTest` — `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@AutoConfigureWebTestClient`, con `GitHubService` reemplazado por `@MockitoBean`: valida el flujo real csrf-token → cookie + cabecera → `/api/projects`, con sus caminos 404 (sin cabecera, sin cookie, o sin coincidir). Incluye la **regresión que importa**: `pedirElTokenNoCreaSesionEnServidor`, que falla si `/api/csrf-token` vuelve a emitir cookie `SESSION`.
 - `ChatCsrfIntegrationTest` — el CSRF nativo sobre `POST /api/chat`, que al vivir dentro de la cadena de Spring Security solo se puede comprobar con el contexto levantado: una respuesta de `/api/**` emite la cookie, un estático **no** (el caso que protege de las cachés compartidas), y el POST pasa solo si cookie y cabecera coinciden — sin cabecera o con otra, 403 sin llegar al modelo.
@@ -324,11 +359,11 @@ npm run lint      # ESLint (flat config + react-hooks)
 - `hooks/useProjects.test.js` — estados `loading` → `success`/`error` mockeando `api/client.js` (`ensureCsrfCookie` + `getProjects`).
 - `hooks/useRevealOnScroll.test.jsx` — `IntersectionObserver` mockeado: observa los `.rv` al montar, añade `.on` al intersectar, `disconnect()` al desmontar.
 - `i18n/LanguageContext.test.jsx` — detección de idioma (`localStorage` > navegador > default), `setLang` (persistencia, `<html lang>`, idiomas no soportados), error al usar `useLanguage` fuera del provider.
-- `components/MobileDrawer.test.jsx` — el menú móvil ofrece el chat (traducido) y avisa a `App` al pulsarlo.
-- `components/Chat.test.jsx` — el panel lo controla `App`: cerrado solo se ve el lanzador, `open` lo abre desde fuera y `hidden` esconde el lanzador con el menú abierto.
+- `components/MobileDrawer.test.jsx` — el menú móvil ofrece el chat (traducido) y avisa a `App` al pulsarlo. Y la regresión de accesibilidad: **cerrado lleva `inert` + `aria-hidden`**, abierto no.
+- `components/Chat.test.jsx` — el panel lo controla `App`: cerrado solo se ve el lanzador, `open` lo abre desde fuera y `hidden` esconde el lanzador con el menú abierto. Y que **al cerrarse corta el stream** en curso.
 - `components/RichText.test.jsx`, `LanguageToggle.test.jsx`, `Contact.test.jsx`, `Footer.test.jsx` — comportamiento observable: negritas → `<strong>`, botón de idioma activo/click, CV descargable por idioma, año dinámico.
 - `api/streamChat.test.js` — el parser SSE: reconstruye el texto, aguanta que un evento llegue troceado entre lecturas, une varias líneas `data:` de un mismo evento, manda el token en `X-XSRF-TOKEN`, y distingue 429 del resto.
-- `hooks/useChat.test.js` — turno de usuario + turno del asistente rellenándose con el stream, preguntas vacías ignoradas, token CSRF reutilizado, y mensajes de límite/error sin romper la UI.
+- `hooks/useChat.test.js` — turno de usuario + turno del asistente rellenándose con el stream, preguntas vacías ignoradas, token CSRF reutilizado, y mensajes de límite/error sin romper la UI. Más el aborto: `cancel()` corta el stream **en vuelo** y no deja mensaje de error en el turno a medias.
 - `components/ProjectCard.test.jsx` — título legible (y respeto de mayúsculas existentes), chips de lenguaje y topics, ausencia de chips si el repo no trae topics, "actualizado hace X" localizado (con `vi.setSystemTime`) y omitido si no hay `pushed_at`, enlace y descripción de respaldo.
 
 No hay tests de `CustomCursor` (loop de `requestAnimationFrame` puramente imperativo) ni de componentes de solo layout (`Hero`, `About`, `Navbar`, `MobileDrawer`, `GithubCard`, `Projects`) — bajo valor relativo al esfuerzo de mockear DOM/IntersectionObserver para lo que son, en esencia, vistas sin lógica propia.
@@ -371,6 +406,14 @@ Asistente que responde preguntas sobre el perfil de Adrián, montado sobre **su 
 - `ai.api-key=${OPENROUTER_API_KEY:}` — sin ella, modo respaldo.
 - `ai.model=${AI_MODEL:google/gemma-4-31b-it:free}` — el tier gratuito de OpenRouter son **20 req/min y 50 req/día** (1.000/día si alguna vez se compran $10 en créditos). Al agotarse entra el mensaje de respaldo. **Si el modelo se cae, el chat entero se cae con él**: este estuvo devolviendo 502 durante una hora larga (fallo del proveedor — fallaba igual en local y en producción, mientras `gemma-4-26b-a4b-it:free` respondía bien) y todo visitante veía el mensaje de respaldo. Se recuperó solo. La salida rápida no es tocar código: **cambiar `AI_MODEL` en Railway no necesita despliegue**, y el valor de este fichero solo se aplica si esa variable no está puesta, así que conviene mirar cuál de las dos manda antes de editar nada.
 - `ai.read-timeout=25s` — seguro **porque hay streaming**: el primer token llega rápido. En una llamada no-streaming OpenRouter no envía nada hasta terminar de generar, y 25s mataría respuestas largas.
+
+**Cerrar el panel aborta el stream**: `useChat` crea un `AbortController` por envío y
+expone `cancel()`, que llama la limpieza del efecto de `Chat` —el momento exacto en que
+el panel se cierra— y también el desmontaje. Sin eso el `fetch` seguía vivo escribiendo
+en un estado que ya no se pinta. Un `AbortError` **no se pinta**: abortar es una decisión
+del visitante, y mostrarlo dejaría un "no puedo responder" pegado al final del turno a
+medias. El panel lleva además `aria-modal` y devuelve el foco al lanzador al cerrarse (si
+no, se queda en el `<body>` y la siguiente tabulación empieza desde arriba de la página).
 
 **En móvil**: el estado abierto/cerrado del chat vive en `App` (no dentro de
 `Chat`) porque lo abren dos sitios: el botón flotante y el menú hamburguesa. El
@@ -434,12 +477,17 @@ de escritorio estrecho el fallo **no aparece**, solo sale un scroll horizontal.
 - CSS global pendiente de pasar a CSS Modules de forma incremental.
 - **CI en GitHub Actions** (`.github/workflows/ci.yml`): en cada push/PR a `main` o `dev` corre tests de backend, tests + build de frontend, y por último el `mvnw package` completo (el mismo que ejecuta Railway al desplegar). Declara `permissions: contents: read`: los jobs solo leen el repo, y sin ese bloque el `GITHUB_TOKEN` hereda el permiso por defecto del repositorio, que puede ser de escritura.
 - **Dependabot** (`.github/dependabot.yml`): maven y npm semanales, actions mensual. Existe porque los avisos de dependencias solo aparecían si alguien lanzaba `npm audit` a mano. Con una excepción anotada: **no se aceptan subidas de línea de Spring Boot** (mayor/menor), solo parches de la 4.0.x — ver la nota de Spring Cloud más abajo.
-- **`commons-fileupload` excluido del `pom.xml`**: llegaba por `prompt-link` → Spring Cloud OpenFeign → `feign-form-spring`, y solo sirve para subir ficheros multipart por Feign (aquí las llamadas a OpenRouter son JSON). La rama 1.x está sin mantenimiento y arrastra CVE-2025-48976, así que viajaba dentro del jar únicamente para que cualquier escáner de la imagen la marcara. Comprobado tras excluirla: el chat responde entero, sin `NoClassDefFoundError`.
+- **Dos exclusiones en el `pom.xml`, las dos por lo mismo**: dependencias que `prompt-link` arrastra vía Spring Cloud OpenFeign, que aquí no se usan, y que viajaban dentro del jar únicamente para que cualquier escáner de la imagen las marcara.
+  - **`commons-fileupload`**: llega por `feign-form-spring` y solo sirve para subir ficheros multipart por Feign (aquí las llamadas a OpenRouter son JSON). La rama 1.x está sin mantenimiento y arrastra CVE-2025-48976. Comprobado tras excluirla: el chat responde entero, sin `NoClassDefFoundError`.
+  - **`bcprov-jdk18on`** (BouncyCastle 1.81): llega por `spring-cloud-starter` y lo único que lo usa es el descifrado de configuración del bootstrap de Spring Cloud, que aquí no se activa. Arrastra cuatro avisos, dos **críticos**: reuso de keystream en GOST 28147 CTR (GHSA-574f-3g2m-x479) y bypass de Name Constraints (GHSA-9pwp-9qqc-pr26). Comprobado: la suite entera pasa sin él —los tres tests que levantan contexto incluidos— y desaparece del árbol.
+- **Jackson va fijado por delante del parent** (`jackson-bom.version` 3.1.7 y `jackson-2-bom.version` 2.21.7): Boot 4.0.8 trae 3.1.5 y 2.21.5, con cinco avisos cada uno (tres HIGH), y no van a llegar por parche porque 4.0.8 es la última 4.0.x. **Son dos propiedades porque en el jar viajan dos Jackson**: el 3 que usa Boot y el 2 que arrastra `prompt-link`; mientras `prompt-link` no migre, hay que parchear los dos.
+  - **Ojo el día que se pueda subir de línea**: estas propiedades *fijan* la versión, así que si un parent futuro trajera un Jackson más nuevo, estas líneas lo **frenarían**. Al subir de Boot hay que comprobar cuál de las dos versiones es mayor y, si gana la del parent, borrarlas.
 - **Arranque limpio en producción**: se excluye `ReactiveUserDetailsServiceAutoConfiguration` (la app no autentica a nadie, así que el usuario en memoria de Spring Security y su password aleatoria solo ensuciaban el log) y el `ENTRYPOINT` del Dockerfile pasa `--enable-native-access=ALL-UNNAMED`, que desde Java 24 hace falta para que Netty no avise en cada arranque.
 - **Mockito se pasa como `-javaagent`** (surefire + `dependency:properties` en el `pom.xml`): auto-adjuntarse dejará de funcionar en JDKs futuros y avisaba en cada build.
 - **`mvnw` tiene que estar en el índice de git como `100755`**: creado desde Windows entró como `100644` y el runner de Linux respondía `Permission denied` (el paso fallaba en 0 s, sin llegar a compilar). Si se vuelve a añadir el wrapper: `git update-index --chmod=+x mvnw`.
 - **No se puede subir a Spring Boot 4.1.x**: `prompt-link` arrastra Spring Cloud OpenFeign, y el verificador de compatibilidad de Spring Cloud 2025.1.x aborta el arranque con *"Spring Boot [4.1.1] is not compatible with this Spring Cloud release train — change to [4.0.x]"*. Comprobado: con 4.1.1 fallan los 4 tests que levantan contexto (los unitarios pasan, porque no arrancan Spring). Para subir habría que actualizar antes `prompt-link` a un release train de Spring Cloud compatible con Boot 4.1. **4.0.8 es la última versión usable.**
-- **`vite` (devDependency) con vulnerabilidades conocidas** (moderate/high, vía `npm audit`): afectan solo al servidor de desarrollo (`vite dev`), no al build de producción que sirve Spring Boot. Actualizar a Vite 8 es un cambio mayor (breaking) pendiente de evaluar aparte.
+- **Quedan dos avisos de `npm audit`, los de `esbuild` ≤0.24.2 vía `vite` 5**: afectan solo al servidor de desarrollo (`vite dev`), no al build de producción que sirve Spring Boot. Cerrarlos exige **Vite 8**, que son tres líneas mayores de salto y va aparte. Los otros cinco (`baseline-browser-mapping`, `brace-expansion`, `browserslist`, `source-map-js`, `undici`) se cerraron con el lock, sin tocar `package.json`.
+  - `npm ls` avisa de que el `esbuild` hoisteado no cumple el rango del `vite` 8 que trae `vitest`. **No es un árbol roto**: ahí `esbuild` es un peer *opcional* y ese Vite usa rolldown. Comprobado reproduciendo el job de CI entero (`npm ci` + tests + build). Desaparece solo el día que el proyecto pase a Vite 8.
 - **ESLint configurado** (`frontend/eslint.config.js`, flat config con react-hooks): `npm run lint`.
 - **`pushed_at` no es la fecha del último commit**: GitHub lo actualiza con cualquier push a *cualquier* rama (ramas de Dependabot, borrado de ramas…), así que el "Actualizado hace X" de las tarjetas puede indicar actividad que no es del autor. La fecha real sería `GET /repos/{owner}/{repo}/commits?per_page=1` (una llamada extra por repo). Se optó por mantener `pushed_at` por simplicidad.
 - `hreflang` (es / en / x-default) declarado en `index.html`. Las tres alternativas apuntan a la misma URL porque el idioma se cambia en cliente.
