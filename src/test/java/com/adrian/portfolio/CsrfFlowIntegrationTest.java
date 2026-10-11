@@ -104,4 +104,22 @@ class CsrfFlowIntegrationTest {
                 .exchange()
                 .expectStatus().isNotFound();
     }
+
+    /**
+     * El 404 del portero sale cortando la cadena, asi que si el filtro corre antes
+     * de quien pone las cabeceras, no las lleva. Durante un tiempo salio sin
+     * ninguna, y lo que importa es el {@code Cache-Control}: un 404 sin el lo puede
+     * cachear por heuristica una caché compartida (RFC 9111) y servirselo luego a
+     * un visitante que si trae token. Solo se ve con la cadena entera levantada.
+     */
+    @Test
+    void el404LlevaCacheControlYLasCabecerasDeSeguridad() {
+        client.get().uri("/api/projects")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectHeader().valueEquals(HttpHeaders.CACHE_CONTROL,
+                        "no-cache, no-store, max-age=0, must-revalidate")
+                .expectHeader().exists("Content-Security-Policy")
+                .expectHeader().valueEquals("X-Content-Type-Options", "nosniff");
+    }
 }

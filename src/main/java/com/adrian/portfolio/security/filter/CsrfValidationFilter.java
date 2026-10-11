@@ -29,14 +29,17 @@ import reactor.core.publisher.Mono;
  *
  * <p>Responde 404 y no 403 para no confirmar que el endpoint existe.
  *
- * <p>El orden es -99 y no -100: en -100 empataba con el {@code WebFilterChainProxy}
- * de Spring Security y le ganaba el desempate, asi que el 404 salia sin CSP, sin
- * HSTS y —lo que importa— sin {@code Cache-Control}, y un 404 sin esa cabecera lo
- * puede cachear por heuristica una caché compartida y servirselo luego a quien si
- * trae token. Detras de Security y delante de {@link CacheControlFilter} (-90).
+ * <p><b>El orden tiene que ser posterior al de los filtros que ponen cabeceras</b>,
+ * porque este responde cortando la cadena: lo que no haya corrido antes no llega a
+ * registrar su {@code beforeCommit}. En -100 empataba con el
+ * {@code WebFilterChainProxy} de Spring Security y le ganaba el desempate, asi que
+ * el 404 salia sin una sola cabecera. Lo que importa es el {@code Cache-Control}:
+ * un 404 sin el lo puede cachear por heuristica una caché compartida y servirselo
+ * luego a quien si trae token. De ahi -85, detras de Security (-100) y de
+ * {@link CacheControlFilter} (-90).
  */
 @Component
-@Order(-99)
+@Order(-85)
 public class CsrfValidationFilter implements WebFilter {
 
     private static final String PROTECTED_PATH = "/api/projects";
