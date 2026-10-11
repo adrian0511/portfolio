@@ -61,6 +61,8 @@ export async function streamChat({ csrfToken, question, history, onChunk, signal
     buffer += decoder.decode(value, { stream: true })
 
     // Un evento SSE termina en línea en blanco; lo que quede se procesa luego.
+    // Si el stream corta a mitad de un evento, ese resto se descarta y no se
+    // pinta: es lo que manda la especificación ("discard the incomplete event").
     const events = buffer.split('\n\n')
     buffer = events.pop()
 

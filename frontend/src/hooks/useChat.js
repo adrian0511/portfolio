@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ensureCsrfCookie, streamChat } from '../api/client.js'
 
 const MAX_HISTORY = 6
@@ -7,6 +7,16 @@ export default function useChat(t) {
   const [messages, setMessages] = useState([])
   const [sending, setSending] = useState(false)
   const tokenRef = useRef(null)
+  const abortRef = useRef(null)
+
+  // Cerrar el panel (o desmontar) no paraba el fetch: seguia llegando el stream
+  // y seguia escribiendo en un estado que ya nadie mira.
+  const cancel = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+  }, [])
+
+  useEffect(() => cancel, [cancel])
 
   const send = useCallback(
     async (question) => {
@@ -27,6 +37,9 @@ export default function useChat(t) {
           return next
         })
 
+      const controller = new AbortController()
+      abortRef.current = controller
+
       try {
         if (!tokenRef.current) tokenRef.current = await ensureCsrfCookie()
 
@@ -35,16 +48,20 @@ export default function useChat(t) {
           question: text,
           history: messages.slice(-MAX_HISTORY),
           onChunk: appendToLast,
+          signal: controller.signal,
         })
       } catch (err) {
+        // Abortar es una decisión del visitante, no un fallo que contarle.
+        if (err.name === 'AbortError') return
         console.error('Chat:', err)
         appendToLast(err.message === 'chat: rate-limit' ? t.chat.limit : t.chat.error)
       } finally {
+        if (abortRef.current === controller) abortRef.current = null
         setSending(false)
       }
     },
     [messages, sending, t]
   )
 
-  return { messages, sending, send }
+  return { messages, sending, send, cancel }
 }

@@ -46,6 +46,37 @@ describe('useChat', () => {
     expect(client.ensureCsrfCookie).toHaveBeenCalledTimes(1)
   })
 
+  // Cerrar el panel a mitad de respuesta tenia que parar el fetch, y el aborto
+  // no es un fallo que contarle al visitante: si se pintara, el turno se
+  // quedaria con un "no puedo responder" pegado al final.
+  it('cancel aborta el stream en vuelo sin dejar mensaje de error', async () => {
+    let signal
+    vi.spyOn(client, 'streamChat').mockImplementation(
+      (args) =>
+        new Promise((_resolve, reject) => {
+          signal = args.signal
+          args.onChunk('a medias')
+          args.signal.addEventListener('abort', () => {
+            const err = new Error('aborted')
+            err.name = 'AbortError'
+            reject(err)
+          })
+        })
+    )
+
+    const { result } = renderHook(() => useChat(t))
+    act(() => {
+      result.current.send('hola')
+    })
+    await waitFor(() => expect(signal).toBeInstanceOf(AbortSignal))
+
+    await act(async () => result.current.cancel())
+
+    expect(signal.aborted).toBe(true)
+    expect(result.current.messages.at(-1).content).toBe('a medias')
+    expect(result.current.sending).toBe(false)
+  })
+
   it('muestra el mensaje de límite cuando el backend responde 429', async () => {
     vi.spyOn(client, 'streamChat').mockRejectedValue(new Error('chat: rate-limit'))
     vi.spyOn(console, 'error').mockImplementation(() => {})

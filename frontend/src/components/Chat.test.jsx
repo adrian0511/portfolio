@@ -4,8 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { LanguageProvider } from '../i18n/LanguageContext.jsx'
 import Chat from './Chat.jsx'
 
+const cancel = vi.fn()
+
 vi.mock('../hooks/useChat.js', () => ({
-  default: () => ({ messages: [], sending: false, send: vi.fn() }),
+  default: () => ({ messages: [], sending: false, send: vi.fn(), cancel }),
 }))
 
 function renderChat(props) {
@@ -35,6 +37,21 @@ describe('Chat', () => {
     renderChat({ hidden: true })
 
     expect(document.querySelector('.chat-launcher')).toHaveClass('hidden')
+  })
+
+  // Cerrar el panel no paraba el fetch: el stream seguia llegando y seguia
+  // escribiendo en un estado que ya nadie mira.
+  it('al cerrarse corta el stream en curso', () => {
+    cancel.mockClear()
+    const { rerender } = renderChat({ open: true })
+
+    rerender(
+      <LanguageProvider>
+        <Chat open={false} onOpenChange={() => {}} />
+      </LanguageProvider>
+    )
+
+    expect(cancel).toHaveBeenCalled()
   })
 
   it('el lanzador pide a App que lo abra', async () => {

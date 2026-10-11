@@ -8,17 +8,32 @@ import ChatText from './ChatText.jsx'
 export default function Chat({ open, onOpenChange: setOpen, hidden = false }) {
   const { t } = useLanguage()
   const [draft, setDraft] = useState('')
-  const { messages, sending, send } = useChat(t)
+  const { messages, sending, send, cancel } = useChat(t)
   const logRef = useRef(null)
   const inputRef = useRef(null)
+  const launcherRef = useRef(null)
 
+  // La limpieza de este efecto es el momento exacto en que el panel se cierra:
+  // con open en false el efecto sale antes de registrar nada, asi que no deja
+  // limpieza que pudiera dispararse de mas.
   useEffect(() => {
     if (!open) return
     const onKey = (e) => e.key === 'Escape' && setOpen(false)
     document.addEventListener('keydown', onKey)
     inputRef.current?.focus()
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, setOpen])
+
+    // El lanzador se renderiza siempre (esta fuera del {open && ...}), pero se
+    // copia aqui porque leer un ref en la limpieza es leerlo demasiado tarde.
+    const launcher = launcherRef.current
+
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      cancel()
+      // Devolver el foco al lanzador: si no, se queda en el <body> y la
+      // siguiente tabulacion empieza otra vez desde arriba de la pagina.
+      if (document.contains(launcher)) launcher.focus()
+    }
+  }, [open, setOpen, cancel])
 
   // Seguir el texto según se genera, sin que el usuario tenga que desplazarse.
   useEffect(() => {
@@ -34,6 +49,7 @@ export default function Chat({ open, onOpenChange: setOpen, hidden = false }) {
   return (
     <>
       <button
+        ref={launcherRef}
         className={`chat-launcher${open || hidden ? ' hidden' : ''}`}
         onClick={() => setOpen(true)}
         aria-label={t.chat.open}
@@ -43,7 +59,7 @@ export default function Chat({ open, onOpenChange: setOpen, hidden = false }) {
       </button>
 
       {open && (
-        <section className="chat-panel" role="dialog" aria-label={t.chat.title}>
+        <section className="chat-panel" role="dialog" aria-modal="true" aria-label={t.chat.title}>
           <header className="chat-head">
             <div>
               <strong>{t.chat.title}</strong>
