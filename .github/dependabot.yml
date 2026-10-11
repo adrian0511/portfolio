@@ -1,5 +1,11 @@
-# Sin esto, las vulnerabilidades de dependencias solo aparecen si a alguien se le
-# ocurre lanzar `npm audit` o mirar el arbol de Maven a mano.
+# Este fichero son las SUBIDAS DE VERSION: los PR semanales con lo que haya
+# salido nuevo. Los avisos de CVE no salen de aqui, son el interruptor
+# "Dependabot alerts" de Settings -> Code security, que es aparte y estuvo
+# apagado un tiempo: con el off, una dependencia vulnerable solo aparecia si a
+# alguien se le ocurria lanzar `npm audit` o mirar el arbol de Maven a mano.
+# Las "security updates" (los PR automaticos ante un CVE) se dejan APAGADAS a
+# proposito: su lock lo escribe el npm de Dependabot, y eso no se puede mergear
+# sin mas -ver el aviso de la entrada de npm, mas abajo-.
 version: 2
 updates:
   - package-ecosystem: maven
