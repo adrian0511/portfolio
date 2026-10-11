@@ -33,6 +33,15 @@
     <java.version>25</java.version>
     <maven.compiler.release>25</maven.compiler.release>
     <skip.frontend>false</skip.frontend>
+
+    <!-- Por delante de lo que fija Boot 4.0.8 (3.1.5 y 2.21.5), que arrastran
+         cinco avisos cada uno (tres HIGH: GHSA-cxp5-3px4-pw24,
+         GHSA-q4xh-88c3-wmh7, GHSA-wv8q-qhhj-9h54). No va a llegar por parche
+         del parent: 4.0.8 es la ultima 4.0.x, y de la 4.1 no se puede pasar.
+         Son dos lineas porque en el jar viajan dos Jackson: el 3 de Boot y el
+         2 que arrastra prompt-link. -->
+    <jackson-bom.version>3.1.7</jackson-bom.version>
+    <jackson-2-bom.version>2.21.7</jackson-2-bom.version>
 </properties>
 	<dependencies>
 		<dependency>
@@ -72,6 +81,15 @@
 				<exclusion>
 					<groupId>commons-fileupload</groupId>
 					<artifactId>commons-fileupload</artifactId>
+				</exclusion>
+				<!-- Llega por Spring Cloud OpenFeign -> spring-cloud-starter, y solo
+				     lo usa el descifrado de configuracion del bootstrap, que aqui no
+				     se activa. La 1.81 arrastra cuatro avisos, dos criticos
+				     (GHSA-574f-3g2m-x479, GHSA-9pwp-9qqc-pr26), asi que viajaba en
+				     el jar unicamente para que lo marcara cualquier escaner. -->
+				<exclusion>
+					<groupId>org.bouncycastle</groupId>
+					<artifactId>bcprov-jdk18on</artifactId>
 				</exclusion>
 			</exclusions>
 		</dependency>
