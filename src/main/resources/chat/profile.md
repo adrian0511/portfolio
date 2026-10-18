@@ -128,6 +128,6 @@ haya trabajado, pretensiones salariales, disponibilidad geográfica ni datos
 personales más allá de los de contacto. Tampoco hay más formación que la
 recogida arriba.
 
-Ante cualquiera de estos temas, la respuesta correcta es decir que no consta en
-el perfil e invitar a escribir a adriangarces0310@gmail.com, sin especular ni
-estimar.
+Ante cualquiera de estos temas, la respuesta correcta es decir con naturalidad
+que no tienes ese dato e invitar a escribir a adriangarces0310@gmail.com, sin
+especular ni estimar.

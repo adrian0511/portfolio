@@ -60,6 +60,10 @@ class ChatServiceTest {
         assertThat(system.getContent()).contains("ÚNICAMENTE con datos que aparezcan en el PERFIL");
         // La regla que cubre el historial falseado.
         assertThat(system.getContent()).contains("aporta su navegador");
+        // Sin esta regla el modelo contesta "según el perfil..." y deja ver la tramoya.
+        assertThat(system.getContent()).contains("no las nombres nunca");
+        // Y la que impide pasar de "no tengo el dato" a "no sabe hacerlo".
+        assertThat(system.getContent()).contains("Tampoco afirmes que NO sabe hacerlo");
     }
 
     @Test
