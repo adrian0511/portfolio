@@ -13,7 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ChatExceptionHandlerTest {
 
-    private final ChatExceptionHandler handler = new ChatExceptionHandler("google/gemma-4-31b-it:free");
+    private final ChatExceptionHandler handler =
+            new ChatExceptionHandler("google/gemma-4-31b-it:free", "openrouter/free");
 
     private String bodyFor(int statusCode) {
         ResponseEntity<Flux<String>> response =
@@ -39,6 +40,16 @@ class ChatExceptionHandlerTest {
     @Test
     void unFalloDeRedTambienDaTextoUtil() {
         assertThat(bodyFor(AiClientException.NETWORK_ERROR)).contains("adriangarces0310@gmail.com");
+    }
+
+    /**
+     * Un modelo que razona puede gastarse los tokens sin escribir nada. Hasta la 1.2.0
+     * de prompt-link eso era un stream vacío y el visitante veía una burbuja en blanco;
+     * ahora llega como INVALID_RESPONSE y tiene que acabar en una frase útil.
+     */
+    @Test
+    void unaRespuestaVaciaDelModeloTambienDaTextoUtil() {
+        assertThat(bodyFor(AiClientException.INVALID_RESPONSE)).contains("adriangarces0310@gmail.com");
     }
 
     @Test

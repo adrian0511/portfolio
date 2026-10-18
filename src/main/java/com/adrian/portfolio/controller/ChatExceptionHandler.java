@@ -23,9 +23,12 @@ public class ChatExceptionHandler {
     private static final String CONTACT = "adriangarces0310@gmail.com";
 
     private final String model;
+    private final String fallbacks;
 
-    public ChatExceptionHandler(@Value("${ai.model:}") String model) {
+    public ChatExceptionHandler(@Value("${ai.model:}") String model,
+            @Value("${ai.models:}") String fallbacks) {
         this.model = model;
+        this.fallbacks = fallbacks;
     }
 
     @ExceptionHandler(AiClientException.class)
@@ -43,13 +46,17 @@ public class ChatExceptionHandler {
      * El modelo va en la línea porque un 400 es OpenRouter rechazando el id, y sin
      * verlo no hay nada que diagnosticar. Entre comillas: así se ven los espacios
      * que viajan pegados al valor, que es lo que tuvo el chat caído en producción.
+     *
+     * <p>En un fallo de configuración va el mensaje de la librería y no un texto fijo:
+     * desde la 1.2.0 no es solo la API key, también un ai.models de más de 3 o un
+     * ai.reasoning contradictorio, y el mensaje nombra la propiedad.
      */
     private void log(AiClientException error) {
         if (error.getStatusCode() == AiClientException.CONFIGURATION_ERROR) {
-            log.warn("Chat sin configurar: falta ai.api-key");
+            log.warn("Chat sin configurar: {}", error.getMessage());
         } else {
-            log.error("Fallo del modelo '{}' (statusCode={}): {}",
-                    model, error.getStatusCode(), error.getMessage());
+            log.error("Fallo del modelo '{}' con respaldo '{}' (statusCode={}): {}",
+                    model, fallbacks, error.getStatusCode(), error.getMessage());
         }
     }
 

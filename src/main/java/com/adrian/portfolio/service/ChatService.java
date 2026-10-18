@@ -88,14 +88,14 @@ public class ChatService {
             """;
 
     public ChatService(ReactiveAiService aiService, GitHubService gitHubService,
-            @Value("${ai.model:}") String model) {
+            @Value("${ai.model:}") String model, @Value("${ai.models:}") String fallbacks) {
         this.aiService = aiService;
         this.gitHubService = gitHubService;
         this.profile = loadProfile();
 
-        // Lo fija AI_MODEL si está en el entorno y, si no, el properties: cuál de los
-        // dos manda no se ve en ningún otro sitio.
-        log.info("Chat con el modelo '{}'", model);
+        // Los fijan AI_MODEL / AI_MODELS si están en el entorno y, si no, el
+        // properties: cuál de los dos manda no se ve en ningún otro sitio.
+        log.info("Chat con el modelo '{}' y respaldo '{}'", model, fallbacks);
     }
 
     private String loadProfile() {
